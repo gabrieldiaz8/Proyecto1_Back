@@ -4,10 +4,15 @@ import { GlobalExceptionFilter } from './modules/common/filters/global-exception
 import { ValidationPipe } from '@nestjs/common';
 import * as bodyParser from 'body-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cors from "cors";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
+  app.use(cors({
+    origin: "https://gabrieldiaz8.github.io",
+    credentials: true, // si usás cookies/sesiones
+  }));
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -136,13 +136,13 @@ El proyecto cuenta con una semilla (seed) que permite cargar los datos iniciales
 Una vez iniciado el backend, ejecutar una petición `GET` al siguiente endpoint:
 
 ```http
-GET http://localhost:3000/api/seed/seed-all
+GET http://localhost:3000/api/seed-all/execute
 ```
 
 Por ejemplo, utilizando `curl`:
 
 ```bash
-curl http://localhost:3000/api/seed/seed-all
+curl http://localhost:3000/api/seed-all/execute
 ```
 
 También puede ejecutarse desde herramientas como Postman, Insomnia o directamente desde el navegador.

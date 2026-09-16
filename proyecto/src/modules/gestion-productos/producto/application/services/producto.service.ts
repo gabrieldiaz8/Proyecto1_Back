@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -27,6 +28,13 @@ import { ProductoRelatedEntitiesValidator } from '../../infraestructure/validato
 import { ProductoUniquenessValidator } from '../../infraestructure/validators/producto-uniqueness.validator.ts';
 import { UsuarioValidator } from 'src/modules/common/utils/validation/usuario-validator';
 import { ProductoDeletePolicy } from '../policies/producto-delete.policy';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
+import {
+  AlcanceAjustePrecio,
+  ModalidadAjustePrecio,
+  TipoAjustePrecio,
+} from '../../enums/ajuste-precio.enum';
+import { ResultadoActualizacionMasiva } from '../../domain/interfaces/actualizar-precios-resultado.interface';
 @Injectable()
 export class ProductoService {
   private readonly logger = new Logger(ProductoService.name);
@@ -416,5 +424,94 @@ export class ProductoService {
     return { marca, linea, usuario };
   }
 
+
+  // ========== CR-006: ACTUALIZACIÓN MASIVA DE PRECIOS ==========
+
+  async actualizarPreciosMasivo(
+    dto: ActualizarPreciosMasivoDto,
+  ): Promise<ResultadoActualizacionMasiva> {
+    this.logger.log(
+      `[CR-006] Iniciando actualización masiva de precios. Alcance: ${dto.alcance}, Tipo: ${dto.tipoAjuste}, Modalidad: ${dto.modalidad}, Valor: ${dto.valor}`,
+    );
+
+    // 1. Selección según alcance
+    let productos: Producto[];
+
+    if (dto.alcance === AlcanceAjustePrecio.GLOBAL) {
+      productos = await this.repository.findActivos();
+    } else {
+      if (!dto.lineaId) {
+        throw new BadRequestException(
+          'El ID de la línea es obligatorio cuando el alcance es por línea.',
+        );
+      }
+      productos = await this.repository.findActivosByLinea(dto.lineaId);
+    }
+
+    // 2. Validación de lote vacío
+    if (productos.length === 0) {
+      throw new NotFoundException(
+        'No se encontraron productos para el alcance seleccionado.',
+      );
+    }
+
+    this.logger.log(`[CR-006] ${productos.length} productos encontrados para procesar.`);
+
+    // 3. Procesamiento tolerante a fallos
+    const productosAActualizar: Producto[] = [];
+    const excluidos: ResultadoActualizacionMasiva['excluidos'] = [];
+
+    for (const producto of productos) {
+      try {
+        if (
+          dto.tipoAjuste === TipoAjustePrecio.AUMENTO &&
+          dto.modalidad === ModalidadAjustePrecio.MONTO
+        ) {
+          producto.aumentarPrecioPorMonto(dto.valor);
+        } else if (
+          dto.tipoAjuste === TipoAjustePrecio.AUMENTO &&
+          dto.modalidad === ModalidadAjustePrecio.PORCENTAJE
+        ) {
+          producto.aumentarPrecioPorPorcentaje(dto.valor);
+        } else if (
+          dto.tipoAjuste === TipoAjustePrecio.DISMINUCION &&
+          dto.modalidad === ModalidadAjustePrecio.MONTO
+        ) {
+          producto.disminuirPrecioPorMonto(dto.valor);
+        } else {
+          producto.disminuirPrecioPorPorcentaje(dto.valor);
+        }
+
+        productosAActualizar.push(producto);
+      } catch (error: unknown) {
+        const motivo =
+          error instanceof Error ? error.message : 'Error desconocido';
+        this.logger.warn(
+          `[CR-006] Producto ID ${producto.id} excluido: ${motivo}`,
+        );
+        excluidos.push({
+          id: producto.id,
+          denominacion: producto.denominacion,
+          motivo,
+        });
+      }
+    }
+
+    // 4. Persistencia en lote de los exitosos
+    if (productosAActualizar.length > 0) {
+      await this.repository.saveMany(productosAActualizar);
+    }
+
+    this.logger.log(
+      `[CR-006] Finalizado. Actualizados: ${productosAActualizar.length}, Excluidos: ${excluidos.length}`,
+    );
+
+    // 5. Retorno
+    return {
+      totalProcesados: productos.length,
+      actualizadosExitosamente: productosAActualizar.length,
+      excluidos,
+    };
+  }
 
 }

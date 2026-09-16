@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -439,7 +440,12 @@ export class ProductoService {
     if (dto.alcance === AlcanceAjustePrecio.GLOBAL) {
       productos = await this.repository.findActivos();
     } else {
-      productos = await this.repository.findActivosByLinea(dto.lineaId!);
+      if (!dto.lineaId) {
+        throw new BadRequestException(
+          'El ID de la línea es obligatorio cuando el alcance es por línea.',
+        );
+      }
+      productos = await this.repository.findActivosByLinea(dto.lineaId);
     }
 
     // 2. Validación de lote vacío

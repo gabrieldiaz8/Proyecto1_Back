@@ -486,6 +486,25 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       .getMany();
   }
 
+  async findActivos(): Promise<Producto[]> {
+    return this.repository
+      .createQueryBuilder('producto')
+      .where('producto.deletedAt IS NULL')
+      .getMany();
+  }
+
+  async findActivosByLinea(lineaId: number): Promise<Producto[]> {
+    return this.repository
+      .createQueryBuilder('producto')
+      .where('producto.linea_id = :lineaId', { lineaId })
+      .andWhere('producto.deletedAt IS NULL')
+      .getMany();
+  }
+
+  async saveMany(productos: Producto[]): Promise<Producto[]> {
+    return this.repository.save(productos);
+  }
+
 
   async existsByCodigoProveedor(codigoProveedor: string, excludeId: number): Promise<boolean> {
     try {

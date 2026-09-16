@@ -39,7 +39,7 @@ import { ProductoService } from '../services/producto.service';
 @UseGuards(AuthGuard)
 export class ProductoController {
   private readonly logger = new Logger(ProductoController.name);
-  constructor(private readonly service: ProductoService) {}
+  constructor(private readonly service: ProductoService) { }
 
   private readonly ENTITY_NAME = 'Producto';
 
@@ -51,7 +51,7 @@ export class ProductoController {
     this.logger.log(`Creando un nuevo ${this.ENTITY_NAME}...`);
     return this.service.create(createDto);
   }
-  
+
   @Get('find-all-for-marcas/select')
   @Roles(
     'Root',
@@ -162,7 +162,7 @@ export class ProductoController {
     description: 'Actualización masiva de precios por porcentaje o monto.',
   })
   actualizarPreciosMasivo(@Body() dto: ActualizarPreciosMasivoDto) {
-    this.logger.log(`[CR-006] Solicitud de actualización masiva de precios recibida.`);
+    this.logger.log(`Solicitud de actualización masiva de precios recibida.`);
     return this.service.actualizarPreciosMasivo(dto);
   }
 

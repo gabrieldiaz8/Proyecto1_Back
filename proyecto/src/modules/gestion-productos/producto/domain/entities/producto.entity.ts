@@ -99,7 +99,6 @@ export class Producto {
   @Column({ type: 'timestamp', nullable: true })
   fechaCostoDolar?: Date;
 
-
   @Column('boolean', { default: false })
   destacado?: boolean;
 
@@ -140,8 +139,7 @@ export class Producto {
   @Column({ type: 'int', nullable: true })
   lineaId?: number;
 
-
- // ==========  MARCA ==========
+  // ==========  MARCA ==========
   @ManyToOne(() => Marca, (marca) => marca.productos)
   @JoinColumn({ name: 'marca_id' })
   marca: Marca;
@@ -173,7 +171,7 @@ export class Producto {
   @Column({ type: 'text', nullable: true })
   codigoReferencia?: string | null;
 
-  // ========== CR-006: AJUSTE MASIVO DE PRECIOS ==========
+  // ========== AJUSTE MASIVO DE PRECIOS ==========
 
   aumentarPrecioPorMonto(monto: number): void {
     this.validarValorAjuste(monto);

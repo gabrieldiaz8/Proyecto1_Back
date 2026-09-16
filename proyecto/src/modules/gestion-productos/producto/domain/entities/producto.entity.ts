@@ -198,25 +198,25 @@ export class Producto {
   }
 
   private validarValorAjuste(valor: number): void {
-    if (!Number.isFinite(valor) || valor <= 0) {
-      throw new Error('El valor del ajuste debe ser mayor que 0.');
-    }
+    this.asegurarValorPositivo(valor, 'El valor del ajuste debe ser mayor que 0.');
   }
 
   private actualizarPrecioManteniendoMargen(nuevoPrecio: number): void {
-    if (!Number.isFinite(nuevoPrecio) || nuevoPrecio <= 0) {
-      throw new Error('El precio final debe ser mayor que 0.');
-    }
+    this.asegurarValorPositivo(nuevoPrecio, 'El precio final debe ser mayor que 0.');
     const margenActual = this.porcentaje ?? 0;
     const costoRecalculado =
       margenActual === 0
         ? nuevoPrecio
         : nuevoPrecio / (1 + margenActual / 100);
-    if (!Number.isFinite(costoRecalculado) || costoRecalculado <= 0) {
-      throw new Error('El precio final debe ser mayor que 0.');
-    }
+    this.asegurarValorPositivo(costoRecalculado, 'El precio final debe ser mayor que 0.');
     this.precio = nuevoPrecio;
     this.costo = costoRecalculado;
+  }
+
+  private asegurarValorPositivo(valor: number, mensaje: string): void {
+    if (!Number.isFinite(valor) || valor <= 0) {
+      throw new Error(mensaje);
+    }
   }
 }
 

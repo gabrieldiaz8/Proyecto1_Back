@@ -15,6 +15,7 @@ import {
 
 import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import { NormalizeDenominacionPipe } from 'src/modules/common/pipes/normalize-denominations.pipe';
 import { AuthGuard } from 'src/modules/gestion-usuario/auth/auth.guard';
 import { Roles } from 'src/modules/gestion-usuario/auth/roles.decorator';
@@ -153,6 +154,16 @@ export class ProductoController {
   findOne(@Param('id', ParseIntPipe) id: number): Promise<ProductoDto> {
     this.logger.log(`Buscando  ${this.ENTITY_NAME} con ID: ${id}`);
     return this.service.findDtoById(+id);
+  }
+
+  @Put('precios/masivo')
+  @Roles('Root', 'Administrador')
+  @ApiOkResponse({
+    description: 'Actualización masiva de precios por porcentaje o monto.',
+  })
+  actualizarPreciosMasivo(@Body() dto: ActualizarPreciosMasivoDto) {
+    this.logger.log(`[CR-006] Solicitud de actualización masiva de precios recibida.`);
+    return this.service.actualizarPreciosMasivo(dto);
   }
 
   @Put(':id')

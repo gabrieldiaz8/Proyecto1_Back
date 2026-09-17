@@ -4,7 +4,7 @@ import { Column, CreateDateColumn, DeleteDateColumn, Entity, Index, OneToMany, P
 
 @Entity('super_linea')
 @Index(['denominacion', 'deletedAt'], { unique: true })
-export class SuperLineaEntity {
+export class SuperLinea {
     @PrimaryGeneratedColumn()
     id: number;
 

@@ -1,123 +1,194 @@
 import {
+  ConflictException,
   Inject,
   Injectable,
   Logger,
-  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateSuperLineaDto } from '../../dto/create-super-linea.dto';
-import { UpdateSuperLineaDto } from '../../dto/update-super-linea.dto';
-import { SuperLinea } from '../../domain/entities/super-linea.entity';
+import { ensureNotSistemaEntity } from 'src/modules/common/utils/atrituto-sistema';
+import { UsuarioService } from 'src/modules/gestion-usuario/usuario/application/services/usuario.service';
+import { PaginacionUtils } from 'src/modules/common/utils/pagination/paginacion-utils';
+import { MessageFrontUtils } from 'src/modules/common/utils/message/message-front.util';
 import { ISuperLineaRepository } from '../../domain/interfaces/super-linea.repository.interface';
-import { PoliticaEliminacionSuperLinea } from '../../domain/service/politica-eliminacion-super-linea.service';
+import { UpdateSuperLineaDto } from '../../dto/update-super-linea.dto';
+import { CreateSuperLineaDto } from '../../dto/create-super-linea.dto';
 import { SuperLineaDto } from '../../dto/super-linea.dto';
 import { SuperLineaMapper } from '../../mappers/super-linea.mapper';
-import { ensureNotSistemaEntity } from 'src/modules/common/utils/atrituto-sistema';
-import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
+import { PoliticaEliminacionSuperLinea } from '../../domain/service/politica-eliminacion-super-linea.service';
+import { SuperLinea } from '../../domain/entities/super-linea.entity';
 
 @Injectable()
 export class SuperLineaService {
   private readonly logger = new Logger(SuperLineaService.name);
-
   constructor(
     @Inject('ISuperLineaRepository')
-    private readonly superLineaRepository: ISuperLineaRepository,
+    private readonly repository: ISuperLineaRepository,
+    private readonly usuarioService: UsuarioService,
     private readonly politicaEliminacion: PoliticaEliminacionSuperLinea,
   ) {}
 
-  async create(createDto: CreateSuperLineaDto): Promise<SuperLinea> {
-    await this.checkDenominacionExists(createDto.denominacion);
-    return this.superLineaRepository.create(createDto);
+  private readonly ENTITY_NAME = 'SuperLínea';
+
+  async create(dto: CreateSuperLineaDto) {
+    this.logger.log(
+      `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion}`,
+    );
+    await this.checkDenominacionExists(dto.denominacion, 0);
+    await this.repository.create(dto);
+
+    return MessageFrontUtils.createSimple(
+      `${this.ENTITY_NAME}`,
+      dto.denominacion,
+      'creada',
+    );
   }
 
-  async findAllFor(denominacion: string): Promise<SuperLineaDto[]> {
-    const entidades = await this.superLineaRepository.findAllFor(denominacion);
-    return entidades.map(SuperLineaMapper.toDto);
+  async update(id: number, dto: UpdateSuperLineaDto) {
+    this.logger.log(`Actualizando ${this.ENTITY_NAME} con ID: ${id}`);
+    const superLinea = await this.findEntityById(id);
+    ensureNotSistemaEntity(superLinea, 'SuperLínea');
+
+    if (dto.denominacion) {
+      await this.checkDenominacionExists(dto.denominacion, id);
+    }
+
+    const entity = await this.repository.update(id, dto);
+    return MessageFrontUtils.createSimple(
+      `${this.ENTITY_NAME}`,
+      entity.denominacion,
+      'editada',
+    );
   }
 
-  async findAllListado(): Promise<SuperLineaDto[]> {
-    const entidades = await this.superLineaRepository.findAllListado();
-    return entidades.map(SuperLineaMapper.toDto);
+  async findAllFor(
+    denominacion: string,
+  ): Promise<{ data: SuperLineaDto[]; total: number }> {
+    const result = await this.repository.findAllFor(denominacion);
+    const data: SuperLineaDto[] = result.map((sl) => SuperLineaMapper.toDto(sl));
+    return {
+      data,
+      total: 1,
+    };
+  }
+
+  async findAllListado(): Promise<SuperLinea[]> {
+    const result = await this.repository.findAllListado();
+    return result;
+  }
+
+  async findAllSinSistemaFor(
+    denominacion: string,
+  ): Promise<{ data: SuperLineaDto[]; total: number }> {
+    const result = await this.repository.findAllSinSistemaFor(denominacion);
+    const data: SuperLineaDto[] = result.map((sl) => SuperLineaMapper.toDto(sl));
+    return {
+      data,
+      total: 1,
+    };
+  }
+
+  async findAllSistemaFor(
+    denominacion: string,
+  ): Promise<{ data: SuperLineaDto[]; total: number }> {
+    const result = await this.repository.findAllSistemaFor(denominacion);
+    const data: SuperLineaDto[] = result.map((sl) => SuperLineaMapper.toDto(sl));
+    return {
+      data,
+      total: 1,
+    };
   }
 
   async findBy(
     denominacion: string,
-    skip: number,
-    take: number,
-    incluirEliminados: boolean,
-  ) {
-    const { data, total } = await this.superLineaRepository.findBy(
+    skip = 0,
+    take = 10,
+    incluirEliminados = false,
+  ): Promise<{ data: SuperLineaDto[]; total: number }> {
+    this.logger.log(
+      `Buscando ${this.ENTITY_NAME} ${denominacion} skip=${skip}, take=${take}`,
+    );
+    const result = await this.repository.findBy(
       denominacion,
       skip,
       take,
       incluirEliminados,
     );
-    const dtoData = data.map(SuperLineaMapper.toDto);
-    return { data: dtoData, total };
+    const data: SuperLineaDto[] = result.data.map((sl) =>
+      SuperLineaMapper.toDto(sl),
+    );
+    return {
+      data,
+      total: PaginacionUtils.totalItems(result.total),
+    };
   }
 
-  async findDtoById(id: number): Promise<SuperLineaDto | null> {
-    const entity = await this.superLineaRepository.findOne(id);
-    if (!entity) return null;
+  async findDtoById(id: number) {
+    const entity = await this.repository.findOne(id);
+    if (!entity)
+      throw new NotFoundException(
+        `${this.ENTITY_NAME} con ID ${id} no encontrado.`,
+      );
     return SuperLineaMapper.toDto(entity);
   }
 
-  async findByIdConAuditoria(id: number) {
-    return this.superLineaRepository.findByIdConAuditoria(id);
+  async findEntityById(id: number) {
+    const entity = await this.repository.findOne(id);
+    if (!entity)
+      throw new NotFoundException(
+        `${this.ENTITY_NAME} con ID ${id} no encontrado.`,
+      );
+    return entity;
   }
 
-  async update(id: number, updateDto: UpdateSuperLineaDto): Promise<SuperLinea> {
-    const superLinea = await this.superLineaRepository.findOne(id);
-    if (!superLinea) {
-      throw new NotFoundException(`SuperLínea con ID ${id} no encontrada`);
+  async remove(id: number, usuarioId: number) {
+    const entity = await this.repository.findOne(id);
+
+    if (!entity) {
+      throw new NotFoundException(
+        `${this.ENTITY_NAME} con ID ${id} no encontrado.`,
+      );
     }
 
-    // Regla de negocio: las de sistema (ej. "Sin clasificar") no se editan
-    ensureNotSistemaEntity(
-      superLinea,
-      'No se puede editar esta SuperLínea porque es del sistema.',
-    );
+    ensureNotSistemaEntity(entity, 'SuperLínea');
 
-    if (
-      updateDto.denominacion &&
-      updateDto.denominacion.toLowerCase() !== superLinea.denominacion.toLowerCase()
-    ) {
-      await this.checkDenominacionExists(updateDto.denominacion);
-    }
+    const tieneLineasActivas =
+      await this.politicaEliminacion.tieneLineasActivasParaSuperLinea(id);
 
-    return this.superLineaRepository.update(id, updateDto);
-  }
-
-  async remove(id: number, usuario: Usuario): Promise<SuperLinea> {
-    const superLinea = await this.superLineaRepository.findOne(id);
-    if (!superLinea) {
-      throw new NotFoundException(`SuperLínea con ID ${id} no encontrada`);
-    }
-
-    // Regla 1: No se puede eliminar si es del sistema
-    ensureNotSistemaEntity(
-      superLinea,
-      'No se puede eliminar esta SuperLínea porque es requerida por el sistema.',
-    );
-
-    // Regla 2: Nuestra Política de Eliminación (Puerto) verificando si hay líneas activas
-    const tieneLineas = await this.politicaEliminacion.tieneLineasActivasParaSuperLinea(id);
-    if (tieneLineas) {
+    if (tieneLineasActivas) {
       throw new ConflictException(
         'No se puede eliminar la SuperLínea porque tiene líneas activas asociadas.',
       );
     }
 
-    return this.superLineaRepository.remove(superLinea, usuario);
+    const usuario = await this.usuarioService.findOne(usuarioId);
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con ID ${usuarioId} no encontrado.`);
+    }
+    await this.repository.remove(entity, usuario);
+
+    return MessageFrontUtils.createSimple(
+      `${this.ENTITY_NAME}`,
+      entity.denominacion,
+      'eliminada',
+    );
   }
 
-  private async checkDenominacionExists(denominacion: string): Promise<void> {
-    // Usamos findByDenominacionWith para buscar incluso entre las eliminadas (soft-delete)
-    const existingEntity = await this.superLineaRepository.findByDenominacionWith(denominacion);
-    if (existingEntity) {
-      throw new ConflictException(
-        `Ya existe una SuperLínea con la denominación '${denominacion}'.`,
+  private async checkDenominacionExists(denominacion: string, id: number) {
+    const exists = await this.repository.findByDenominacionWith(denominacion);
+    if (exists && exists.id !== id) {
+      this.logger.warn(
+        `${this.ENTITY_NAME} Conflicto: denominación ya está en uso: ${denominacion}`,
       );
+      throw new ConflictException('Denominación ya en uso.');
     }
+  }
+
+  async findByIdConAuditoria(id: number) {
+    const entity = await this.repository.findByIdConAuditoria(id);
+    if (!entity)
+      throw new NotFoundException(
+        `${this.ENTITY_NAME} con ID ${id} no encontrado.`,
+      );
+    return entity;
   }
 }

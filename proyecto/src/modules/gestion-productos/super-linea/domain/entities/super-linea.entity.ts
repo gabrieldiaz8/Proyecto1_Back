@@ -14,11 +14,8 @@ export class SuperLinea {
     @Column({ type: 'text', nullable: true })
     observacion?: string;
 
-    /*
-    Comentado para que no de error por ahora
-    @OneToMany(() => Linea, (linea) => linea.superLinea)
+    @OneToMany(() => Linea, (linea) => linea.superLinea) // Relación de uno a muchos con Linea
     lineas: Linea[]
-    */
 
     @CreateDateColumn()
     createdAt: Date;

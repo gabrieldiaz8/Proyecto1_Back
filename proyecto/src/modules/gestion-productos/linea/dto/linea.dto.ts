@@ -30,6 +30,15 @@ export class LineaDto {
   @IsNotEmpty()
   utilizaStockMinimo: boolean;
 
+  @ApiProperty({ example: 1, description: 'ID de la superlínea a la que pertenece' })
+  @IsInt()
+  superLineaId: number;
+
+  @ApiProperty({ example: 'Bebidas', description: 'Denominación de la superlínea' })
+  @IsOptional()
+  @IsString()
+  superLineaDenominacion?: string;
+
   @ApiProperty({
     example: '',
     description: 'Observaciones varias sobre la linea',

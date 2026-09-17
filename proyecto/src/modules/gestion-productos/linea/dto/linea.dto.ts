@@ -16,7 +16,7 @@ export class LineaDto {
 
   @ApiProperty({
     example: 'tornillos',
-    description: 'Denominación o nombre dela linea',
+    description: 'Denominación o nombre de la linea',
   })
   @IsString()
   denominacion: string;

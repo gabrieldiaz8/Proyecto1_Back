@@ -12,22 +12,31 @@ import { LineaController } from './application/controllers/linea.controller';
 import { LineaService } from './application/services/linea.service';
 import { ProductoModule } from '../producto/producto.module';
 import { PoliticaEliminacionLinea } from './domain/services/politica-eliminacion-linea.service';
+import { SuperLineaModule } from '../super-linea/super-linea.module';
+import { LineaValidationService } from './domain/services/linea-validation.service';
+import { LineaCountAdapter } from './infraestructure/adapters/linea-count.adapter';
+import { I_LINEA_COUNT_PORT } from '../super-linea/domain/interfaces/linea-count.port';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Linea]),
     forwardRef(() => ProductoModule),
     UsuarioModule,
+    forwardRef(() => SuperLineaModule),
   ],
   controllers: [LineaController],
   providers: [
     LineaService,
     PoliticaEliminacionLinea,
+    LineaValidationService,
     {
       provide: 'ILineaRepository',
       useClass: LineaRepository,
     },
-
+    {
+      provide: I_LINEA_COUNT_PORT, 
+      useClass: LineaCountAdapter, 
+    },
     {
       provide: 'UnitOfWork',
       useFactory: (dataSource: DataSource): IUnitOfWork => {
@@ -43,6 +52,7 @@ import { PoliticaEliminacionLinea } from './domain/services/politica-eliminacion
     LineaService,
     LineaPersistenceAdapter,
     'ILineaRepository',
+    I_LINEA_COUNT_PORT, 
   ],
 })
 export class LineaModule {}

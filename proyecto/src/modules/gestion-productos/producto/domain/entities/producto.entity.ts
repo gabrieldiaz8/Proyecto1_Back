@@ -208,7 +208,7 @@ export class Producto {
       margenActual === 0
         ? nuevoPrecio
         : nuevoPrecio / (1 + margenActual / 100);
-    this.asegurarValorPositivo(costoRecalculado, 'El precio final debe ser mayor que 0.');
+    this.asegurarValorPositivo(costoRecalculado, 'El costo recalculado debe ser mayor que 0.');
     this.precio = nuevoPrecio;
     this.costo = costoRecalculado;
   }

@@ -65,7 +65,7 @@ export class ProductoService {
 
   async create(dto: CreateProductoDto) {
     this.logger.log(
-      `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion} a: ${dto.denominacion}`,
+      `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion}`,
     );
 
     // Orquestar todas las validaciones
@@ -90,7 +90,7 @@ export class ProductoService {
   }
 
   async update(id: number, dto: UpdateProductoDto) {
-    this.logger.log(`Actualizandox  ${this.ENTITY_NAME} con ID: ${id}`);
+    this.logger.log(`Actualizando ${this.ENTITY_NAME} con ID: ${id}`);
 
     const { marca, linea, usuario } =
       await this.validarYPrepararActualizacion(id, dto);
@@ -117,7 +117,7 @@ export class ProductoService {
     skip: number,
     take: number,
   ): Promise<{ data: GetProductoDto[]; total: number }> {
-    this.logger.warn(`service`);
+    this.logger.log(`Buscando ${this.ENTITY_NAME} rápido con código: "${codigo}", exacto: ${exacto}, skip: ${skip}, take: ${take}`);
     const result = await this.repository.findByRapido(
       codigo,
       exacto,
@@ -145,7 +145,7 @@ export class ProductoService {
     skip: number,
     take: number,
   ): Promise<{ data: GetProductoDto[]; total: number }> {
-    this.logger.warn(`service`);
+    this.logger.log(`Buscando ${this.ENTITY_NAME} con filtros — denominacion: "${denominacion}", skip: ${skip}, take: ${take}`);
     const result = await this.repository.findBy(
       denominacion,
       codigoProveedor,
@@ -190,7 +190,7 @@ export class ProductoService {
       throw new NotFoundException(
         `${this.ENTITY_NAME} con ID ${id} no encontrado.`,
       );
-    this.logger.log(`b1x`);
+    this.logger.log(`${this.ENTITY_NAME} con ID ${id} encontrado, mapeando a DTO`);
     return ProductoMapper.toDto(entity);
   }
 
@@ -243,7 +243,7 @@ export class ProductoService {
     take = 10,
   ): Promise<{ data: GetProductoDto[]; total: number }> {
     this.logger.log(
-      `  Buscando en srvice producto o ${denominacion}  skip=${skip}, take=${take}`,
+      `Buscando ${this.ENTITY_NAME} por denominación/código proveedor: "${denominacion}", skip=${skip}, take=${take}`,
     );
     const result =
       await this.repository.findByDenominacionCodigoProveedorFiltered(
@@ -251,7 +251,7 @@ export class ProductoService {
         skip,
         take,
       );
-    this.logger.log(result);
+    this.logger.log(`Búsqueda completada, total encontrados: ${result.total}`);
     return {
       data: result.data.map((producto) => {
         return ProductoMapper.toBusquedaDto(producto);
@@ -478,8 +478,15 @@ export class ProductoService {
           dto.modalidad === ModalidadAjustePrecio.MONTO
         ) {
           producto.disminuirPrecioPorMonto(dto.valor);
-        } else {
+        } else if (
+          dto.tipoAjuste === TipoAjustePrecio.DISMINUCION &&
+          dto.modalidad === ModalidadAjustePrecio.PORCENTAJE
+        ) {
           producto.disminuirPrecioPorPorcentaje(dto.valor);
+        } else {
+          throw new InternalServerErrorException(
+            'Combinación de tipoAjuste y modalidad no soportada.',
+          );
         }
 
         productosAActualizar.push(producto);

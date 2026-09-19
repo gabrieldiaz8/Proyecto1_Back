@@ -245,5 +245,15 @@ describe('Producto - métodos de ajuste de precio (CR-006)', () => {
         'El precio final debe ser mayor que 0.',
       );
     });
+
+    it('debería lanzar error si el costo recalculado resulta <= 0 por un margen negativo extremo', () => {
+      // porcentaje = -200 → divisor = 1 + (-200/100) = -1
+      // nuevoPrecio = 100 + 1 = 101 (pasa la guardia de precio positivo)
+      // costoRecalculado = 101 / -1 = -101 → debe lanzar el error del COSTO, no del precio
+      const producto = crearProducto(100, -200);
+      expect(() => producto.aumentarPrecioPorMonto(1)).toThrow(
+        'El costo recalculado debe ser mayor que 0.',
+      );
+    });
   });
 });

@@ -1,21 +1,99 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductoController } from './producto.controller';
 import { ProductoService } from '../services/producto.service';
-
+import { SearchProductoPaginationWithDto } from '../../dto/search-producto-pagination-with.dto';
+import { AuthGuard } from 'src/modules/gestion-usuario/auth/auth.guard';
 
 describe('ProductoController', () => {
   let controller: ProductoController;
 
+  const mockService = {
+    findBy: jest.fn(),
+  };
+
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ProductoController],
-      providers: [ProductoService],
-    }).compile();
+      providers: [
+        { provide: ProductoService, useValue: mockService },
+      ],
+    })
+    .overrideGuard(AuthGuard)
+    .useValue({ canActivate: () => true })
+    .compile();
 
     controller = module.get<ProductoController>(ProductoController);
   });
 
-  it('should be defined', () => {
+  it('debería estar definido', () => {
     expect(controller).toBeDefined();
+  });
+
+
+  // CR-004: search() — propagación de lineaDenominacion y superLineaDenominacion
+
+  describe('search() — CR-004', () => {
+    it('debería pasar lineaDenominacion al service cuando se recibe en el DTO', async () => {
+      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+
+      const dto = new SearchProductoPaginationWithDto();
+      dto.skip = 0;
+      dto.take = 10;
+      dto.lineaDenominacion = 'ACEITES';
+
+      await controller.search(dto);
+
+      expect(mockService.findBy).toHaveBeenCalledWith(
+        '',           // denominacion default
+        undefined,    // codigoProveedor
+        false,        // codProveedorExacto (default del DTO)
+        undefined,    // codigoReferencia
+        undefined,    // marcaId
+        undefined,    // lineaId
+        undefined,    // proveedorId
+        undefined,    // conStock
+        0,
+        10,
+        'ACEITES',    // lineaDenominacion ✓
+        undefined,    // superLineaDenominacion
+      );
+    });
+
+    it('debería pasar superLineaDenominacion al service cuando se recibe en el DTO', async () => {
+      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+
+      const dto = new SearchProductoPaginationWithDto();
+      dto.skip = 0;
+      dto.take = 10;
+      dto.superLineaDenominacion = 'SALADOS';
+
+      await controller.search(dto);
+
+      expect(mockService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, undefined, undefined,
+        undefined, 0, 10,
+        undefined,      // lineaDenominacion
+        'SALADOS',      // superLineaDenominacion ✓
+      );
+    });
+
+    it('debería pasar undefined para lineaDenominacion y superLineaDenominacion cuando no vienen en el DTO', async () => {
+      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+
+      const dto = new SearchProductoPaginationWithDto();
+      dto.skip = 0;
+      dto.take = 10;
+
+      await controller.search(dto);
+
+      expect(mockService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, undefined, undefined,
+        undefined, 0, 10,
+        undefined,    // lineaDenominacion → undefined ✓
+        undefined,    // superLineaDenominacion → undefined ✓
+      );
+    });
   });
 });

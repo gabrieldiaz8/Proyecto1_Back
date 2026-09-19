@@ -65,4 +65,12 @@ export class SearchProductoPaginationWithDto {
   @IsBoolean()
   conStock: boolean;
 
+  @IsOptional()
+  @IsString()
+  lineaDenominacion?: string;
+
+  @IsOptional()
+  @IsString()
+  superLineaDenominacion?: string;
+
 }

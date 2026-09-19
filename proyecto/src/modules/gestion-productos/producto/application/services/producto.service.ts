@@ -478,8 +478,15 @@ export class ProductoService {
           dto.modalidad === ModalidadAjustePrecio.MONTO
         ) {
           producto.disminuirPrecioPorMonto(dto.valor);
-        } else {
+        } else if (
+          dto.tipoAjuste === TipoAjustePrecio.DISMINUCION &&
+          dto.modalidad === ModalidadAjustePrecio.PORCENTAJE
+        ) {
           producto.disminuirPrecioPorPorcentaje(dto.valor);
+        } else {
+          throw new InternalServerErrorException(
+            'Combinación de tipoAjuste y modalidad no soportada.',
+          );
         }
 
         productosAActualizar.push(producto);

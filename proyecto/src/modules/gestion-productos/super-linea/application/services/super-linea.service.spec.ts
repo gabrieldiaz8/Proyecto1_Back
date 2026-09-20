@@ -4,6 +4,7 @@ import { SuperLineaService } from './super-linea.service';
 import { PoliticaEliminacionSuperLinea } from '../../domain/service/politica-eliminacion-super-linea.service';
 import { ConflictException } from '@nestjs/common';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
+import { UsuarioService } from 'src/modules/gestion-usuario/usuario/application/services/usuario.service';
 
 describe('SuperLineaService', () => {
   let service: SuperLineaService;
@@ -13,12 +14,19 @@ describe('SuperLineaService', () => {
     findByDenominacionWith: jest.fn() as jest.Mock<any>,
     findOne: jest.fn() as jest.Mock<any>,
     findBy: jest.fn() as jest.Mock<any>,
+    findAllFor: jest.fn() as jest.Mock<any>,
+    findAllSinSistemaFor: jest.fn() as jest.Mock<any>,
+    findAllSistemaFor: jest.fn() as jest.Mock<any>,
     remove: jest.fn() as jest.Mock<any>,
     update: jest.fn() as jest.Mock<any>,
   };
 
   const mockPoliticaEliminacion = {
     tieneLineasActivasParaSuperLinea: jest.fn() as jest.Mock<any>,
+  };
+
+  const mockUsuarioService = {
+    findOne: jest.fn() as jest.Mock<any>,
   };
 
   const mockUsuario = { id: 1 } as Usuario;
@@ -28,12 +36,14 @@ describe('SuperLineaService', () => {
       providers: [
         SuperLineaService,
         { provide: 'ISuperLineaRepository', useValue: mockSuperLineaRepository },
+        { provide: UsuarioService, useValue: mockUsuarioService },
         { provide: PoliticaEliminacionSuperLinea, useValue: mockPoliticaEliminacion },
       ],
     }).compile();
 
     service = module.get<SuperLineaService>(SuperLineaService);
     jest.clearAllMocks();
+    mockUsuarioService.findOne.mockResolvedValue(mockUsuario);
   });
 
   // Crear SuperLínea con denominación válida
@@ -99,5 +109,29 @@ describe('SuperLineaService', () => {
 
     await expect(service.update(1, { usuarioUpdatedId: 1 })).rejects.toThrow();
     expect(mockSuperLineaRepository.update).not.toHaveBeenCalled();
+  });
+
+  // findAllSinSistemaFor excluye sistema = 1
+  it('debe devolver solo SuperLíneas sin sistema (sistema = 0)', async () => {
+    const activas = [
+      { id: 2, denominacion: 'Almacén', sistema: 0 },
+      { id: 3, denominacion: 'Golosinas', sistema: 0 },
+    ];
+    mockSuperLineaRepository.findAllSinSistemaFor.mockResolvedValue(activas);
+
+    const result = await service.findAllSinSistemaFor('');
+
+    expect(result.data).toHaveLength(2);
+    expect(result.data[0]).toMatchObject({ id: 2, denominacion: 'Almacén' });
+    expect(mockSuperLineaRepository.findAllSinSistemaFor).toHaveBeenCalledWith('');
+  });
+
+  it('debe filtrar por denominacion en findAllSinSistemaFor', async () => {
+    mockSuperLineaRepository.findAllSinSistemaFor.mockResolvedValue([]);
+
+    const result = await service.findAllSinSistemaFor('Beb');
+
+    expect(result.data).toEqual([]);
+    expect(mockSuperLineaRepository.findAllSinSistemaFor).toHaveBeenCalledWith('Beb');
   });
 });

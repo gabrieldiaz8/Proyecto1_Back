@@ -92,6 +92,7 @@ export class LineaPersistenceAdapter
     try {
       const entity = await this.repository
         .createQueryBuilder('linea')
+        .leftJoinAndSelect('linea.superLinea', 'superLinea')
         .where('linea.id = :id', { id })
         .andWhere('linea.deletedAt IS NULL')
         .getOne();
@@ -116,7 +117,10 @@ export class LineaPersistenceAdapter
 
   async findAllListado(): Promise<Linea[]> {
     try {
-      const query = this.baseQuery();
+      const query = this.baseQuery().leftJoinAndSelect(
+        'linea.superLinea',
+        'superLinea',
+      );
       QueryBuilderHelper.applyOrder(query, this.ALIAS, 'denominacion', 'ASC');
       return await query.getMany();
     } catch (error) {
@@ -178,7 +182,10 @@ export class LineaPersistenceAdapter
     incluirEliminados = false,
   ): Promise<{ data: Linea[]; total: number }> {
     try {
-      const query = this.baseQuery(incluirEliminados)
+      const query = this.baseQuery(incluirEliminados).leftJoinAndSelect(
+        'linea.superLinea',
+        'superLinea',
+      );
 
       if (denominacion) {
         query.andWhere(`UPPER(${this.ALIAS}.denominacion) LIKE :denominacion`, {
@@ -198,7 +205,10 @@ export class LineaPersistenceAdapter
 
   async findAllFor(denominacion: string): Promise<Linea[]> {
     try {
-      const query = this.baseQuery()
+      const query = this.baseQuery().leftJoinAndSelect(
+        'linea.superLinea',
+        'superLinea',
+      );
       query.andWhere('UPPER(linea.denominacion) LIKE :denominacion', {
         denominacion: `%${denominacion.toUpperCase()}%`,
       });
@@ -215,6 +225,7 @@ export class LineaPersistenceAdapter
     try {
       const query = this.repository
         .createQueryBuilder('linea')
+        .leftJoinAndSelect('linea.superLinea', 'superLinea')
         .where('linea.deletedAt IS NULL')
         .andWhere('linea.sistema = :sistema', { sistema: 0 });
       if (denominacion && denominacion.trim() !== '') {

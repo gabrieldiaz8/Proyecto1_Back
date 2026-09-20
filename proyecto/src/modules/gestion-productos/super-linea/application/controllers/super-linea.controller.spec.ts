@@ -13,6 +13,7 @@ describe('SuperLineaController', () => {
     findDtoById: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
+    findAllSinSistemaFor: jest.fn() as jest.Mock<any>,
   };
 
   beforeEach(async () => {
@@ -35,5 +36,21 @@ describe('SuperLineaController', () => {
     const dto = { denominacion: 'test', usuarioCreatedId: 1 };
     await controller.create(dto);
     expect(mockService.create).toHaveBeenCalledWith(dto);
+  });
+
+  it('debe delegar findAllSinSistemaFor con la denominacion del dto', async () => {
+    mockService.findAllSinSistemaFor.mockResolvedValue({ data: [], total: 1 });
+
+    await controller.findAllSinSistemaFor({ denominacion: 'Beb' });
+
+    expect(mockService.findAllSinSistemaFor).toHaveBeenCalledWith('Beb');
+  });
+
+  it('debe usar denominacion vacía si el dto no trae denominacion', async () => {
+    mockService.findAllSinSistemaFor.mockResolvedValue({ data: [], total: 1 });
+
+    await controller.findAllSinSistemaFor({});
+
+    expect(mockService.findAllSinSistemaFor).toHaveBeenCalledWith('');
   });
 });

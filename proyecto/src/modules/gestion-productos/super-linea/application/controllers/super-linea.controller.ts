@@ -20,6 +20,7 @@ import { SuperLineaDto } from '../../dto/super-linea.dto';
 import { NormalizeDenominacionPipe } from 'src/modules/common/pipes/normalize-denominations.pipe';
 import { NormalizeDenominacionSearchPipe } from 'src/modules/common/pipes/normalize-denominations-search.pipe';
 import { PaginationWithDenominacionDto } from 'src/modules/common/dto/busquedas/pagination-with-denominacion.dto';
+import { DenominacionBusquedaDto } from 'src/modules/common/dto/denominacion-busqueda.dto';
 import { Roles } from 'src/modules/gestion-usuario/auth/roles.decorator';
 import { AuthGuard } from 'src/modules/gestion-usuario/auth/auth.guard';
 import { AuditoriaDto } from 'src/modules/gestion-sistema/auditoria/dto/auditoria.dto';
@@ -52,6 +53,14 @@ export class SuperLineaController {
       `Buscando ${this.ENTITY_NAME} con denominación: ${denominacion}`,
     );
     return this.service.findBy(denominacion, skip, take, incluirEliminados);
+  }
+
+  @Get('find-all-for-super-lineas/select')
+  @Roles('Root', 'Administrador', 'Empleado')
+  @UsePipes(NormalizeDenominacionSearchPipe)
+  async findAllSinSistemaFor(@Query() dto: DenominacionBusquedaDto) {
+    const { denominacion = '' } = dto;
+    return this.service.findAllSinSistemaFor(denominacion);
   }
 
   @Get(':id')

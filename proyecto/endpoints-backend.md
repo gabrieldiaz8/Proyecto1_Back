@@ -186,7 +186,10 @@ Base URL (Render): `https://proyecto1-back-xtni.onrender.com`
 ```
 
 > **Queries:**
-> - `search-by` → `?denominacion=&codigoProveedor=&codProveedorExacto=&codigoReferencia=&marcaId=&lineaId=&proveedorId=&conStock=&skip=&take=`
+> - `search-by` → `?denominacion=&codigoProveedor=&codProveedorExacto=&codigoReferencia=&marcaId=&lineaId=&proveedorId=&conStock=&skip=&take=&lineaDenominacion=&superLineaDenominacion=`
+>   - `lineaDenominacion` — texto parcial, insensible a mayúsculas, sobre `linea.denominacion` (opcional).
+>   - `superLineaDenominacion` — texto parcial, insensible a mayúsculas, sobre `superLinea.denominacion` (opcional).
+>   - Ambos pueden combinarse (AND). Si no se envían, el comportamiento es idéntico a antes de CR-004 (retrocompatible).
 > - `search-by-rapido` → `?codigo=&exacto=&skip=&take=`
 > - `find-all-for-marcas/select` y `find-all-for-lineas/select` → `?denominacion=`
 > - `DELETE` → `?usuarioId=` (requerido)

@@ -378,6 +378,25 @@ describe('ProductoService', () => {
       expect(resultado.total).toBe(0);
       expect(mockRepository.findBy).toHaveBeenCalledTimes(1);
     });
+
+    // Caso 6: retrocompatibilidad — solo lineaId, sin los nuevos params de texto
+    it('debería pasar lineaId sin params de texto de CR-004 (retrocompatibilidad)', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '', '', false, '', 0, 5, 0,
+        false, 0, 10,
+        undefined,      // lineaDenominacion
+        undefined,      // superLineaDenominacion
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 5, 0,
+        false, 0, 10,
+        undefined,
+        undefined,
+      );
+    });
   });
 
 });

@@ -95,5 +95,42 @@ describe('ProductoController', () => {
         undefined,    // superLineaDenominacion → undefined ✓
       );
     });
+
+    it('debería pasar ambos params (lineaDenominacion + superLineaDenominacion) juntos en un solo search', async () => {
+      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+
+      const dto = new SearchProductoPaginationWithDto();
+      dto.skip = 0;
+      dto.take = 10;
+      dto.lineaDenominacion = 'lacteos';
+      dto.superLineaDenominacion = 'alimentos';
+
+      await controller.search(dto);
+
+      expect(mockService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, undefined, undefined,
+        undefined, 0, 10,
+        'lacteos',      // lineaDenominacion ✓
+        'alimentos',    // superLineaDenominacion ✓
+      );
+    });
+
+    it('debería pasar solo lineaId sin params de texto (retrocompatibilidad)', async () => {
+      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+
+      const dto = new SearchProductoPaginationWithDto();
+      dto.skip = 0;
+      dto.take = 10;
+      dto.lineaId = 5;
+
+      await controller.search(dto);
+
+      expect(mockService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, 5, undefined,
+        undefined, 0, 10,
+        undefined,    // lineaDenominacion → undefined ✓
+        undefined,    // superLineaDenominacion → undefined ✓
+      );
+    });
   });
 });

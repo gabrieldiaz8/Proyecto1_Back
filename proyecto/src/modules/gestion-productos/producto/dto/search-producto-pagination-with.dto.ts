@@ -1,5 +1,6 @@
 import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SearchProductoPaginationWithDto {
   @IsOptional()
@@ -65,10 +66,18 @@ export class SearchProductoPaginationWithDto {
   @IsBoolean()
   conStock: boolean;
 
+  @ApiPropertyOptional({
+    description:
+      'Denominación (texto parcial) de la línea a filtrar. Busca parcial e insensible a mayúsculas en linea.denominacion.',
+  })
   @IsOptional()
   @IsString()
   lineaDenominacion?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Denominación (texto parcial) de la superlínea a filtrar. Busca parcial e insensible a mayúsculas en superLinea.denominacion.',
+  })
   @IsOptional()
   @IsString()
   superLineaDenominacion?: string;

@@ -4,6 +4,18 @@ export class Porcentaje {
   private readonly _valor: number;
 
   constructor(valor: number) {
+    if (typeof valor !== 'number') {
+      throw new BadRequestException(
+        'El porcentaje debe ser un número.',
+      );
+    }
+
+    if (!Number.isFinite(valor)) {
+      throw new BadRequestException(
+        'El porcentaje debe ser un número finito.',
+      );
+    }
+
     if (valor < 0) {
       throw new BadRequestException(
         'El porcentaje no puede ser negativo.',

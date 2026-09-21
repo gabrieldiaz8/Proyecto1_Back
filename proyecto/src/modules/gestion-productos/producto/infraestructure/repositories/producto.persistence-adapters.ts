@@ -4,19 +4,12 @@ import { Transactional } from 'src/modules/common/decorators/transactional.decor
 import { DatabaseConnectionException } from 'src/modules/common/exceptions/database-connection.exception';
 import { EntityNotFoundException } from 'src/modules/common/exceptions/entity-notFound-exceptions';
 import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
-import { Linea } from 'src/modules/gestion-productos/linea/domain/entities/linea.entity';
-import { Marca } from 'src/modules/gestion-productos/marca/domain/entities/marca.entity';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { Repository, IsNull, DataSource } from 'typeorm';
 import { Producto } from '../../domain/entities/producto.entity';
 import { IProductoRepository } from '../../domain/interfaces/producto.repository-interface';
-import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
-import { UpdateProductoDto } from '../../dto/update-producto.dto';
 import { ProductoMapper } from '../../mappers/producto.mapper';
-import { Denominacion } from '../../domain/value-objects/denominacion.vo';
-import { Costo } from '../../domain/value-objects/costo.vo';
-import { Porcentaje } from '../../domain/value-objects/porcentaje.vo';
 
 
 @Injectable()
@@ -34,74 +27,11 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
 
 
   @Transactional()
-  async create(
-    data: CreateProductoDto,
-    linea: Linea,
-    marca: Marca,
-    usuario: Usuario,
-  ): Promise<Producto> {
+  async save(producto: Producto): Promise<Producto> {
     const repo = this.uow.getRepository(Producto);
-    this.logger.log(`Creando un nuevo p ${this.ENTITY_NAME}`);
-
     try {
-      // DEBUG: Loggear todos los datos que llegan
-      this.logger.debug('Data recibida:', JSON.stringify(data, null, 2));
-      // Verificar que todos los objetos relacionados existan
-      this.logger.debug('Linea:', linea);
-      this.logger.debug('Marca:', marca);
-      this.logger.debug('Usuario:', usuario);
-
-      // Construir VOs a partir de primitivos del DTO
-      const denominacion = new Denominacion(data.denominacion);
-      const costo = new Costo(data.costo ?? 0);
-      const porcentaje = new Porcentaje(data.porcentaje ?? 0);
-
-      // Usar el método estático de la entidad para crear
-      const nuevaEntity = Producto.crear({
-        denominacion,
-        costo,
-        porcentaje,
-        codigoProveedor: data.codigoProveedor,
-        codigoBarra: data.codigoBarra,
-        codigoReferencia: data.codigoReferencia,
-        alicuotaIva: data.alicuotaIva,
-        stock: data.stock,
-        utilizaStockMinimo: data.utilizaStockMinimo,
-        utilizaStockMinimoPorEmpresa: false, // No está en el DTO, valor por defecto
-        stockMinimo: data.stockMinimo,
-        costoDolar: data.costoDolar,
-        cotizacionDolar: undefined, // No está en el DTO
-        precioDolar: undefined, // No está en el DTO
-        fechaCosto: data.createdAt,
-        costoEnDolar: data.costoEnDolar,
-        fechaCostoDolar: undefined, // No está en el DTO
-        destacado: data.destacado,
-        envioGratis: data.envioGratis,
-        observacion: data.observacion,
-        linea,
-        marca,
-        usuarioCreated: usuario,
-        utilizaPack: data.utilizaPack,
-        cantidadPorPack: data.cantidadPorPack,
-        imagen: undefined, // No está en el DTO
-        ubicacion: data.ubicacion,
-        sistema: 0,
-      });
-
-      this.logger.debug('Entity creada:', nuevaEntity);
-
-      const entityGuardada = await repo.save(nuevaEntity);
-      this.logger.log(`Entity guardada con ID: ${entityGuardada.id}`);
-
-      this.logger.log(
-        `${this.ENTITY_NAME} creado exitosamente con ID: ${entityGuardada.id}`,
-      );
-
-
-      return entityGuardada;
+      return await repo.save(producto);
     } catch (error) {
-      this.logger.error(`Error al crear ${this.ENTITY_NAME}:`, error);
-      this.logger.error('Stack trace:', error);
       throw new DatabaseConnectionException(
         'Error al guardar en la base de datos.',
       );
@@ -186,78 +116,6 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       );
     }
   }
-
-  @Transactional()
-  async update(
-    id: number,
-    data: UpdateProductoDto,
-    linea: Linea,
-    marca: Marca,
-
-    usuario: Usuario,
-  ): Promise<Producto> {
-    const repo = this.uow.getRepository(Producto);
-    try {
-      const entity = await this.findOne(id);
-
-      if (!entity) {
-        throw new NotFoundException(`EL prodcuto con ID ${id} no encontrada`);
-      }
-
-      // Construir VOs únicamente si el campo viene definido en el DTO
-      const denominacion = data.denominacion !== undefined
-        ? new Denominacion(data.denominacion)
-        : undefined;
-      
-      const costo = data.costo !== undefined
-        ? new Costo(data.costo)
-        : undefined;
-      
-      const porcentaje = data.porcentaje !== undefined
-        ? new Porcentaje(data.porcentaje)
-        : undefined;
-
-      // Usar el método de instancia para actualizar
-      entity.actualizarDatos({
-        denominacion,
-        costo,
-        porcentaje,
-        codigoProveedor: data.codigoProveedor,
-        codigoBarra: data.codigoBarra,
-        codigoReferencia: data.codigoReferencia,
-        alicuotaIva: data.alicuotaIva,
-        stock: data.stock,
-        utilizaStockMinimo: data.utilizaStockMinimo,
-        utilizaStockMinimoPorEmpresa: undefined, // No está en el DTO
-        stockMinimo: data.stockMinimo,
-        costoDolar: data.costoDolar,
-        cotizacionDolar: undefined, // No está en el DTO
-        precioDolar: undefined, // No está en el DTO
-        fechaCosto: undefined, // No está en el DTO
-        costoEnDolar: data.costoEnDolar,
-        fechaCostoDolar: undefined, // No está en el DTO
-        destacado: data.destacado,
-        envioGratis: data.envioGratis,
-        observacion: data.observacion,
-        linea: data.lineaId !== undefined ? linea : undefined,
-        marca: data.marcaId !== undefined ? marca : undefined,
-        usuarioUpdated: usuario,
-        utilizaPack: data.utilizaPack,
-        cantidadPorPack: data.cantidadPorPack,
-        imagen: undefined, // No está en el DTO
-        ubicacion: data.ubicacion,
-      });
-
-      const entityActualizada = await repo.save(entity);
-
-      return entityActualizada;
-    } catch (error) {
-      this.logger.warn(`Items para eliminar: )}`);
-
-      throw new DatabaseConnectionException(error);
-    }
-  }
-
 
   async updateEntity(uow: IUnitOfWork, producto: Producto): Promise<Producto> {
     const repo = uow.getRepository(Producto);

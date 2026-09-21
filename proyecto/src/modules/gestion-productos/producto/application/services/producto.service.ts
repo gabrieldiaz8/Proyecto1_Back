@@ -65,48 +65,49 @@ export class ProductoService {
 
   async create(dto: CreateProductoDto) {
     this.logger.log(
-      `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion} a: ${dto.denominacion}`,
+      `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion}`,
     );
 
     // Orquestar todas las validaciones
     const { marca, linea, usuario } =
       await this.validarYPrepararCreacion(dto);
 
+    // Construir la entidad a partir del DTO
+    const entity = ProductoMapper.toNewEntity(dto, linea, marca, usuario);
 
-
-    const entity = await this.repository.create(
-      dto,
-      linea,
-      marca,
-
-      usuario,
-    );
+    // Persistir
+    const entityGuardada = await this.repository.save(entity);
 
     return MessageFrontUtils.createSimple(
       `${this.ENTITY_NAME}`,
-      entity.denominacion,
+      entityGuardada.denominacion,
       'creada',
     );
   }
 
   async update(id: number, dto: UpdateProductoDto) {
-    this.logger.log(`Actualizandox  ${this.ENTITY_NAME} con ID: ${id}`);
+    this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
 
-    const { marca, linea, usuario } =
+    // La validación obtiene el producto actual: si no existe, el adapter ya
+    // lanzó el 404 (EntityNotFoundException) y el service lo ratifica con
+    // NotFoundException; nada de esto pasa por save() ni se envuelve.
+    const { marca, linea, usuario, productoActual } =
       await this.validarYPrepararActualizacion(id, dto);
 
-    const entity = await this.repository.update(
-      id,
+    const cambios = ProductoMapper.toCambiosActualizacion(
       dto,
       linea,
       marca,
-
       usuario,
     );
 
+    productoActual.actualizarDatos(cambios);
+
+    const entityActualizada = await this.repository.save(productoActual);
+
     return MessageFrontUtils.createSimple(
       `${this.ENTITY_NAME}`,
-      entity.denominacion,
+      entityActualizada.denominacion,
       'editada',
     );
   }
@@ -421,7 +422,7 @@ export class ProductoService {
       dto.usuarioUpdatedId,
     );
 
-    return { marca, linea, usuario };
+    return { marca, linea, usuario, productoActual };
   }
 
 

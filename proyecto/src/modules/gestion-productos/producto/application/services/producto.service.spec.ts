@@ -63,7 +63,7 @@ describe('ProductoService', () => {
     findBy: jest.fn(),
     findByRapido: jest.fn(),
     findByIdWithoutRelations: jest.fn(),
-    update: jest.fn(),
+    save: jest.fn(),
     updateEntity: jest.fn(),
     actualizarPrecio: jest.fn(),
     remove: jest.fn(),
@@ -74,7 +74,6 @@ describe('ProductoService', () => {
     existsProductosActivosByMarca: jest.fn(),
     existsProductosActivosByLinea: jest.fn(),
     findByIds: jest.fn(),
-    create: jest.fn(),
   };
 
   // Mocks vacíos para todos los demás providers inyectados

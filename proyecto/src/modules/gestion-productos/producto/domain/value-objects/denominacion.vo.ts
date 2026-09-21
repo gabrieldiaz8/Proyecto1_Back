@@ -4,7 +4,13 @@ export class Denominacion {
   private readonly _valor: string;
 
   constructor(valor: string) {
-    const trimmed = valor?.trim() ?? '';
+    if (typeof valor !== 'string') {
+      throw new BadRequestException(
+        'La denominación debe ser una cadena de texto.',
+      );
+    }
+
+    const trimmed = valor.trim();
 
     if (trimmed.length === 0) {
       throw new BadRequestException(

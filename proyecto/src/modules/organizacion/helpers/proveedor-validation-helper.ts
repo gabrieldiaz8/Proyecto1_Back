@@ -76,6 +76,16 @@ export class ProveedorValidationHelper {
     }
   }
 
+  private validarFormatoCuit(cuit?: string): void {
+    if (cuit === undefined || cuit === null || cuit.trim() === '') return;
+
+    if (!/^\d{11}$/.test(cuit)) {
+      throw new BadRequestException(
+        'El CUIT debe contener exactamente 11 dígitos numéricos, sin guiones ni espacios.',
+      );
+    }
+  }
+
   async validateCreateProveedor(dto: CreateProveedorDto) {
     const denominacion = await this.validateAndGetDenominacionUnique(
       dto.denominacion,
@@ -83,6 +93,7 @@ export class ProveedorValidationHelper {
     );
     const usuario = await this.validateAndGetUsuario(dto.usuarioCreatedId);
     const categoriaIVA = await this.validateAndGetCondicionIva(dto);
+    this.validarFormatoCuit(dto.cuit);
     await this.validateAndGetCuitUnique(dto.cuit, 0);
 
     return { usuario, categoriaIVA };
@@ -96,6 +107,7 @@ export class ProveedorValidationHelper {
     }
     const usuario = await this.validateAndGetUsuario(dto.usuarioUpdatedId);
     const categoriaIVA = await this.validateAndGetCondicionIva(dto);
+    this.validarFormatoCuit(dto.cuit);
     await this.validateAndGetCuitUnique(dto.cuit, id);
 
     return { usuario, categoriaIVA };

@@ -14,6 +14,9 @@ import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
 import { ProductoMapper } from '../../mappers/producto.mapper';
+import { Denominacion } from '../../domain/value-objects/denominacion.vo';
+import { Costo } from '../../domain/value-objects/costo.vo';
+import { Porcentaje } from '../../domain/value-objects/porcentaje.vo';
 
 
 @Injectable()
@@ -48,11 +51,41 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       this.logger.debug('Marca:', marca);
       this.logger.debug('Usuario:', usuario);
 
-      const nuevaEntity = repo.create({
-        ...data,
+      // Construir VOs a partir de primitivos del DTO
+      const denominacion = new Denominacion(data.denominacion);
+      const costo = new Costo(data.costo ?? 0);
+      const porcentaje = new Porcentaje(data.porcentaje ?? 0);
+
+      // Usar el método estático de la entidad para crear
+      const nuevaEntity = Producto.crear({
+        denominacion,
+        costo,
+        porcentaje,
+        codigoProveedor: data.codigoProveedor,
+        codigoBarra: data.codigoBarra,
+        codigoReferencia: data.codigoReferencia,
+        alicuotaIva: data.alicuotaIva,
+        stock: data.stock,
+        utilizaStockMinimo: data.utilizaStockMinimo,
+        utilizaStockMinimoPorEmpresa: false, // No está en el DTO, valor por defecto
+        stockMinimo: data.stockMinimo,
+        costoDolar: data.costoDolar,
+        cotizacionDolar: undefined, // No está en el DTO
+        precioDolar: undefined, // No está en el DTO
+        fechaCosto: data.createdAt,
+        costoEnDolar: data.costoEnDolar,
+        fechaCostoDolar: undefined, // No está en el DTO
+        destacado: data.destacado,
+        envioGratis: data.envioGratis,
+        observacion: data.observacion,
         linea,
         marca,
         usuarioCreated: usuario,
+        utilizaPack: data.utilizaPack,
+        cantidadPorPack: data.cantidadPorPack,
+        imagen: undefined, // No está en el DTO
+        ubicacion: data.ubicacion,
+        sistema: 0,
       });
 
       this.logger.debug('Entity creada:', nuevaEntity);
@@ -170,19 +203,52 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       if (!entity) {
         throw new NotFoundException(`EL prodcuto con ID ${id} no encontrada`);
       }
-      const {
 
-        ...dataSinItems
-      } = data;
+      // Construir VOs únicamente si el campo viene definido en el DTO
+      const denominacion = data.denominacion !== undefined
+        ? new Denominacion(data.denominacion)
+        : undefined;
+      
+      const costo = data.costo !== undefined
+        ? new Costo(data.costo)
+        : undefined;
+      
+      const porcentaje = data.porcentaje !== undefined
+        ? new Porcentaje(data.porcentaje)
+        : undefined;
 
-      Object.assign(entity, dataSinItems, {
-        linea,
-        marca,
+      // Usar el método de instancia para actualizar
+      entity.actualizarDatos({
+        denominacion,
+        costo,
+        porcentaje,
+        codigoProveedor: data.codigoProveedor,
+        codigoBarra: data.codigoBarra,
+        codigoReferencia: data.codigoReferencia,
+        alicuotaIva: data.alicuotaIva,
+        stock: data.stock,
+        utilizaStockMinimo: data.utilizaStockMinimo,
+        utilizaStockMinimoPorEmpresa: undefined, // No está en el DTO
+        stockMinimo: data.stockMinimo,
+        costoDolar: data.costoDolar,
+        cotizacionDolar: undefined, // No está en el DTO
+        precioDolar: undefined, // No está en el DTO
+        fechaCosto: undefined, // No está en el DTO
+        costoEnDolar: data.costoEnDolar,
+        fechaCostoDolar: undefined, // No está en el DTO
+        destacado: data.destacado,
+        envioGratis: data.envioGratis,
+        observacion: data.observacion,
+        linea: data.lineaId !== undefined ? linea : undefined,
+        marca: data.marcaId !== undefined ? marca : undefined,
+        usuarioUpdated: usuario,
+        utilizaPack: data.utilizaPack,
+        cantidadPorPack: data.cantidadPorPack,
+        imagen: undefined, // No está en el DTO
+        ubicacion: data.ubicacion,
       });
 
-      entity.usuarioUpdated = usuario; 
       const entityActualizada = await repo.save(entity);
-
 
       return entityActualizada;
     } catch (error) {

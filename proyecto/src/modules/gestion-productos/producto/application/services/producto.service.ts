@@ -260,7 +260,7 @@ export class ProductoService {
     return this.repository.existsProductosActivosByLinea(lineaId);
   }
 
-  async actualizarPrecio(id: number, dto: UpdatePrecioDto, usuarioId: number) {
+  async actualizarPrecio(id: number, dto: UpdatePrecioDto) {
     const usuario = await this.usuarioService.findOne(usuarioId);
     if (!usuario) {
       throw new NotFoundException(`Usuario con ID ${usuarioId} no encontrado.`);

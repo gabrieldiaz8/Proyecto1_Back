@@ -60,6 +60,10 @@ export class ProductoMapper {
     entity.fechaCostoDolar = new Date();
     entity.fechaCosto = new Date();
 
+    if (dto.precio !== undefined) {
+      entity.precio = dto.precio;
+    }
+
     entity.usuarioUpdated = usuario;
   }
 

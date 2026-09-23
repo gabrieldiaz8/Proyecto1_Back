@@ -51,7 +51,7 @@ export class CreateProveedorDto implements CondicionIvaValidable {
 
   @IsString()
   @IsOptional()
-  @MaxLength(11)
+  @MaxLength(255)
   @ApiProperty({
     example: 'CUIT',
     description: 'Tipo de identificación fiscal',

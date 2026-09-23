@@ -11,6 +11,7 @@ import {
   IsEnum,
 } from 'class-validator';
 import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
+import { UnidadMedida } from '../domain/enums/unidad-medida.enum';
 
 export class CreateProductoDto {
   @Transform(({ value }) => value.trim().toLowerCase())
@@ -83,6 +84,16 @@ export class CreateProductoDto {
   @IsOptional()
   @IsInt()
   cantidadPorPack?: number;
+
+  @IsOptional()
+  @IsNumber()
+  presentacionCantidad?: number | null;
+
+  @IsOptional()
+  @IsEnum(UnidadMedida, {
+    message: 'La unidad de medida debe ser una de: KG, G, L, ML, UN, CC, LT, MG.',
+  })
+  presentacionUnidadMedida?: UnidadMedida | null;
 
   @IsOptional()
   @IsNumber()

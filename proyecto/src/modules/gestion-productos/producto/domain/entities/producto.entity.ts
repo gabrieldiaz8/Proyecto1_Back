@@ -18,6 +18,8 @@ import { MonetarioColumn } from 'src/modules/common/decorators/monetario-column.
 import { CantidadColumn } from 'src/modules/common/decorators/cantidad-column.decorator';
 import { PorcentajeColumn } from 'src/modules/common/decorators/porcentaje-column.decorator';
 import { Proveedor } from 'src/modules/organizacion/proveedor/domain/entities/proveedor.entity';
+import { UnidadMedida } from '../enums/unidad-medida.enum';
+import { Presentacion } from '../value-objects/presentacion.vo';
 
 @Entity('producto')
 export class Producto {
@@ -155,6 +157,57 @@ export class Producto {
 
   @Column({ type: 'int', nullable: true })
   cantidadPorPack: number | null;
+
+  // ========== PRESENTACION ==========
+  @Column({
+    name: 'presentacion_cantidad',
+    type: 'decimal',
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: {
+      to: (value: number | string | null | undefined): string | null =>
+        value === null || value === undefined ? null : value.toString(),
+      from: (value: string | null): number | null =>
+        value === null ? null : Number(value),
+    },
+  })
+  presentacionCantidad?: number | null;
+
+  @Column({
+    name: 'presentacion_unidad_medida',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  presentacionUnidadMedida?: UnidadMedida | null;
+
+  setPresentacion(cantidad: number, unidadMedida: UnidadMedida): void {
+    const presentacion = new Presentacion(cantidad, unidadMedida);
+    this.presentacionCantidad = presentacion.cantidad;
+    this.presentacionUnidadMedida = presentacion.unidadMedida;
+  }
+
+  getPresentacion(): Presentacion | null {
+    if (
+      this.presentacionCantidad === null ||
+      this.presentacionCantidad === undefined ||
+      this.presentacionUnidadMedida === null ||
+      this.presentacionUnidadMedida === undefined
+    ) {
+      return null;
+    }
+
+    return new Presentacion(
+      this.presentacionCantidad,
+      this.presentacionUnidadMedida,
+    );
+  }
+
+  getPresentacionDescripcion(): string | null {
+    const presentacion = this.getPresentacion();
+    return presentacion ? presentacion.getDescripcionFormateada() : null;
+  }
 
   @Column({ type: 'text', nullable: true })
   imagen?: string;

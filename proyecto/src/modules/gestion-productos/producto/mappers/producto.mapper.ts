@@ -41,6 +41,10 @@ export class ProductoMapper {
       stockMinimo: entity.stockMinimo,
       utilizaPack: entity.utilizaPack,
       cantidadPorPack: entity.cantidadPorPack ?? 0,
+      presentacionCantidad: entity.presentacionCantidad ?? undefined,
+      presentacionUnidadMedida:
+        (entity.presentacionUnidadMedida as GetProductoDto['presentacionUnidadMedida']) ??
+        undefined,
       sistema: entity.sistema,
       codigoReferencia: entity.codigoReferencia ?? '',
 
@@ -95,6 +99,10 @@ export class ProductoMapper {
       stockMinimo: entity.stockMinimo ?? 0,
       utilizaPack: entity.utilizaPack ?? false,
       cantidadPorPack: entity.cantidadPorPack ?? 0,
+      presentacionCantidad: entity.presentacionCantidad ?? undefined,
+      presentacionUnidadMedida:
+        (entity.presentacionUnidadMedida as ProductoDto['presentacionUnidadMedida']) ??
+        undefined,
       sistema: entity.sistema,
       codigoReferencia: entity.codigoReferencia ?? '',
 

@@ -261,9 +261,9 @@ export class ProductoService {
   }
 
   async actualizarPrecio(id: number, dto: UpdatePrecioDto) {
-    const usuario = await this.usuarioService.findOne(usuarioId);
+    const usuario = await this.usuarioService.findOne(dto.usuarioId);
     if (!usuario) {
-      throw new NotFoundException(`Usuario con ID ${usuarioId} no encontrado.`);
+      throw new NotFoundException(`Usuario con ID ${dto.usuarioId} no encontrado.`);
     }
     return this.repository.actualizarPrecio(id, dto, usuario);
   }

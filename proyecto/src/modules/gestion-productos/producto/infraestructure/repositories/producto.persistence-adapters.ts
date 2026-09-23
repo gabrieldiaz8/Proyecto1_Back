@@ -393,8 +393,8 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       await this.historialPrecioRepository.save(
         this.uow,
         id,
-        precioAnterior,
-        entity.precio,
+        precioAnterior ?? 0,
+        entity.precio ?? 0,
         dto.motivo,
       );
     }

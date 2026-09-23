@@ -14,6 +14,7 @@ import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
 import { ProductoMapper } from '../../mappers/producto.mapper';
+import { IHistorialPrecioRepository } from 'src/modules/gestion-productos/historial-precio/domain/interfaces/historial-precio.repository.interface';
 
 
 @Injectable()
@@ -27,6 +28,8 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     private readonly repository: Repository<Producto>,
     private readonly dataSource: DataSource,
     @Inject('UnitOfWork') public readonly uow: IUnitOfWork,
+    @Inject('IHistorialPrecioRepository')
+    private readonly historialPrecioRepository: IHistorialPrecioRepository,
   ) { }
 
 
@@ -378,10 +381,23 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       throw new NotFoundException('Producto no encontrado');
     }
 
+    const precioAnterior = entity.precio;
+
+    entity.cambiarPrecio(dto.precio);
+
     ProductoMapper.mapPrecios(entity, dto, usuario);
 
     await repo.save(entity);
 
+    if (entity.precio !== precioAnterior) {
+      await this.historialPrecioRepository.save(
+        this.uow,
+        id,
+        precioAnterior,
+        entity.precio,
+        dto.motivo,
+      );
+    }
   }
 
   async findByDenominacion(denominacion: string): Promise<Producto | null> {

@@ -17,6 +17,6 @@ import { HistorialPrecioController } from './application/controllers/historial-p
       useClass: HistorialPrecioRepository,
     },
   ],
-  exports: [HistorialPrecioService],
+  exports: [HistorialPrecioService, 'IHistorialPrecioRepository'],
 })
 export class HistorialPrecioModule {}

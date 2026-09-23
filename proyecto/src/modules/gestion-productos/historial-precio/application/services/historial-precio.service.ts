@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
 import { IHistorialPrecioRepository } from '../../domain/interfaces/historial-precio.repository.interface';
 import { HistorialPrecioMapper } from '../../mappers/historial-precio.mapper';
 import { GetHistorialPrecioDto } from '../../dto/get-historial-precio.dto';
@@ -14,6 +15,7 @@ export class HistorialPrecioService {
   ) {}
 
   async registrar(
+    uow: IUnitOfWork,
     productoId: number,
     precioAnterior: number,
     precioNuevo: number,
@@ -22,7 +24,7 @@ export class HistorialPrecioService {
     this.logger.log(
       `Registrando cambio de precio para producto ID ${productoId}: ${precioAnterior} → ${precioNuevo}`,
     );
-    await this.repository.save(productoId, precioAnterior, precioNuevo, motivo);
+    await this.repository.save(uow, productoId, precioAnterior, precioNuevo, motivo);
   }
 
   async findByProducto(

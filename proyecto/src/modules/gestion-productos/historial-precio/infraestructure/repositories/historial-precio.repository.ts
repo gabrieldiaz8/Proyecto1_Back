@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
 import { HistorialPrecio } from '../../domain/entities/historial-precio.entity';
 import { IHistorialPrecioRepository } from '../../domain/interfaces/historial-precio.repository.interface';
 import { HistorialPrecioPersistenceAdapter } from './historial-precio.persistence-adapter';
@@ -10,12 +11,13 @@ export class HistorialPrecioRepository implements IHistorialPrecioRepository {
   ) {}
 
   save(
+    uow: IUnitOfWork,
     productoId: number,
     precioAnterior: number,
     precioNuevo: number,
     motivo: string,
   ): Promise<HistorialPrecio> {
-    return this.adapter.save(productoId, precioAnterior, precioNuevo, motivo);
+    return this.adapter.save(uow, productoId, precioAnterior, precioNuevo, motivo);
   }
 
   findByProducto(

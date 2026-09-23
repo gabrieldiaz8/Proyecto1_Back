@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
 import { HistorialPrecio } from '../../domain/entities/historial-precio.entity';
 import { IHistorialPrecioRepository } from '../../domain/interfaces/historial-precio.repository.interface';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class HistorialPrecioPersistenceAdapter
@@ -14,18 +15,15 @@ export class HistorialPrecioPersistenceAdapter
   ) {}
 
   async save(
+    uow: IUnitOfWork,
     productoId: number,
     precioAnterior: number,
     precioNuevo: number,
     motivo: string,
   ): Promise<HistorialPrecio> {
-    const registro = this.repository.create({
-      productoId,
-      precioAnterior,
-      precioNuevo,
-      motivo,
-    });
-    return this.repository.save(registro);
+    const repo = uow.getRepository(HistorialPrecio);
+    const registro = repo.create({ productoId, precioAnterior, precioNuevo, motivo });
+    return repo.save(registro);
   }
 
   async findByProducto(

@@ -31,6 +31,13 @@ export class Producto {
   @Column({ type: 'text' })
   denominacion: string;
 
+  @Column({ name: 'denominacion_manual', type: 'boolean', default: false })
+  denominacionManual: boolean;
+
+  establecerDenominacionManual(manual: boolean): void {
+    this.denominacionManual = manual;
+  }
+
   @Index()
   @Column({ type: 'varchar', length: 255, nullable: true })
   codigoProveedor?: string | null;

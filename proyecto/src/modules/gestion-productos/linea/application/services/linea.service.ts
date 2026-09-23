@@ -16,6 +16,7 @@ import { UpdateLineaDto } from '../../dto/update-linea.dto';
 import { LineaDto } from '../../dto/linea.dto';
 import { LineaMapper } from '../../mappers/linea.mapper';
 import { PoliticaEliminacionLinea } from '../../domain/services/politica-eliminacion-linea.service';
+import { IProductoRepository } from '../../../producto/domain/interfaces/producto.repository-interface';
 import { Linea } from '../../domain/entities/linea.entity';
 
 @Injectable()
@@ -28,6 +29,8 @@ export class LineaService {
     @Inject(forwardRef(() => PoliticaEliminacionLinea))
     private readonly validacionesService: PoliticaEliminacionLinea,
     private readonly usuarioService: UsuarioService,
+    @Inject('IProductoRepository')
+    private readonly productoRepository: IProductoRepository,
 
   ) { }
 
@@ -61,6 +64,17 @@ export class LineaService {
 
 
     const entity = await this.repository.update(id, dto);
+
+    if (dto.denominacion && dto.denominacion !== linea.denominacion) {
+      this.logger.log(
+        `Propagando nueva denominación de ${this.ENTITY_NAME} "${entity.denominacion}" a productos automáticos`,
+      );
+      await this.productoRepository.regenerarDenominacionesPorLinea(
+        id,
+        entity.denominacion,
+      );
+    }
+
     return MessageFrontUtils.createSimple(
       `${this.ENTITY_NAME}`,
       entity.denominacion,

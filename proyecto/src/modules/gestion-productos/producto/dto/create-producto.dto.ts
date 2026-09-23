@@ -14,9 +14,9 @@ import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
 import { UnidadMedida } from '../domain/enums/unidad-medida.enum';
 
 export class CreateProductoDto {
+  @IsOptional()
   @Transform(({ value }) => value.trim().toLowerCase())
   @IsString({ message: 'La denominación debe ser una cadena de texto.' }) // Valida que sea string
-  @IsNotEmpty({ message: 'La denominación no puede estar vacía.' }) // Valida que no esté vacía
   @MaxLength(255, { message: 'La denominación no puede estar vacía.' })
   /*  @Matches(/^[A-Za-z0-9 áéíóúÁÉÍÓÚñÑ.\-/]+$/, {
     message:

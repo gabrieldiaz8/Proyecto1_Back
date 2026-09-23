@@ -79,5 +79,15 @@ export interface IProductoRepository {
   existsProductosActivosByMarca(marcaId: number): Promise<boolean>;
   existsProductosActivosByLinea(lineaId: number): Promise<boolean>;
 
+  regenerarDenominacionesPorMarca(
+    marcaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number>;
+
+  regenerarDenominacionesPorLinea(
+    lineaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number>;
+
   findByIds(ids: number[]): Promise<Producto[]>;
 }

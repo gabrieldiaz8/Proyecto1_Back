@@ -31,6 +31,8 @@ export interface IProductoRepository {
     conStock: boolean,
     skip: number,
     take: number,
+    lineaDenominacion?: string,
+    superLineaDenominacion?: string,
   ): Promise<{ data: Producto[]; total: number }>;
 
   findByRapido(
@@ -80,4 +82,13 @@ export interface IProductoRepository {
   existsProductosActivosByLinea(lineaId: number): Promise<boolean>;
 
   findByIds(ids: number[]): Promise<Producto[]>;
+
+  /** Devuelve todos los productos activos (deletedAt IS NULL). */
+  findActivos(): Promise<Producto[]>;
+
+  /** Devuelve los productos activos filtrados por lineaId. */
+  findActivosByLinea(lineaId: number): Promise<Producto[]>;
+
+  /** Persiste masivamente un array de entidades Producto. */
+  saveMany(productos: Producto[]): Promise<Producto[]>;
 }

@@ -14,6 +14,7 @@ import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
 import { ProductoMapper } from '../../mappers/producto.mapper';
+import { IHistorialPrecioRepository } from 'src/modules/gestion-productos/historial-precio/domain/interfaces/historial-precio.repository.interface';
 
 
 @Injectable()
@@ -27,6 +28,8 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     private readonly repository: Repository<Producto>,
     private readonly dataSource: DataSource,
     @Inject('UnitOfWork') public readonly uow: IUnitOfWork,
+    @Inject('IHistorialPrecioRepository')
+    private readonly historialPrecioRepository: IHistorialPrecioRepository,
   ) { }
 
 
@@ -223,16 +226,19 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     codigoReferencia: string,
     marca_id: number,
     linea_id: number,
-    proveedor_id: number,
+    proveedor_id: number, // No se utiliza, ver que hacer
     conStock: boolean,
     skip: number,
     take: number,
+    lineaDenominacion?: string,
+    superLineaDenominacion?: string,
   ): Promise<{ data: Producto[]; total: number }> {
     this.logger.warn(`llega`);
     const query = this.repository
       .createQueryBuilder('producto')
       .leftJoinAndSelect('producto.marca', 'marca')
       .leftJoinAndSelect('producto.linea', 'linea')
+      .leftJoinAndSelect('linea.superLinea', 'superLinea');
 
     if (denominacion || codigoProveedor || codigoReferencia) {
       const condiciones: string[] = [];
@@ -274,6 +280,16 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     }
     if (linea_id) {
       query.andWhere('linea.id = :linea_id', { linea_id });
+    }
+    if (lineaDenominacion) {
+      query.andWhere('UPPER(linea.denominacion) LIKE UPPER(:lineaDenominacion)',
+        { lineaDenominacion: `%${lineaDenominacion}%` },
+      );
+    }
+    if (superLineaDenominacion) {
+      query.andWhere('UPPER(superLinea.denominacion) LIKE UPPER(:superLineaDenominacion)',
+        { superLineaDenominacion: `%${superLineaDenominacion}%` },
+      );
     }
 
     this.logger.warn(`conStock llega como: ${conStock} (${typeof conStock})`);
@@ -378,10 +394,23 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       throw new NotFoundException('Producto no encontrado');
     }
 
+    const precioAnterior = entity.precio;
+
+    entity.cambiarPrecio(dto.precio);
+
     ProductoMapper.mapPrecios(entity, dto, usuario);
 
     await repo.save(entity);
 
+    if (entity.precio !== precioAnterior) {
+      await this.historialPrecioRepository.save(
+        this.uow,
+        id,
+        precioAnterior ?? 0,
+        entity.precio ?? 0,
+        dto.motivo,
+      );
+    }
   }
 
   async findByDenominacion(denominacion: string): Promise<Producto | null> {
@@ -484,6 +513,25 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       .createQueryBuilder('producto')
       .where('producto.id IN (:...ids)', { ids: uniqueIds })
       .getMany();
+  }
+
+  async findActivos(): Promise<Producto[]> {
+    return this.repository
+      .createQueryBuilder('producto')
+      .where('producto.deletedAt IS NULL')
+      .getMany();
+  }
+
+  async findActivosByLinea(lineaId: number): Promise<Producto[]> {
+    return this.repository
+      .createQueryBuilder('producto')
+      .where('producto.linea_id = :lineaId', { lineaId })
+      .andWhere('producto.deletedAt IS NULL')
+      .getMany();
+  }
+
+  async saveMany(productos: Producto[]): Promise<Producto[]> {
+    return this.repository.save(productos);
   }
 
 

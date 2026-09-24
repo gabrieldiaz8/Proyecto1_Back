@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -18,6 +19,7 @@ import { IProductoRepository } from '../../domain/interfaces/producto.repository
 import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { GetProductoDto } from '../../dto/get-producto.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
+import { UpdatePrecioDto } from '../../dto/update-precio.dto';
 import { ProductoMapper } from '../../mappers/producto.mapper';
 import { LineaService } from 'src/modules/gestion-productos/linea/application/services/linea.service';
 import { MarcaService } from 'src/modules/gestion-productos/marca/application/services/marca.service';
@@ -28,6 +30,13 @@ import { ProductoUniquenessValidator } from '../../infraestructure/validators/pr
 import { UsuarioValidator } from 'src/modules/common/utils/validation/usuario-validator';
 import { ProductoDeletePolicy } from '../policies/producto-delete.policy';
 import { UnidadMedida } from '../../domain/enums/unidad-medida.enum';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
+import {
+  AlcanceAjustePrecio,
+  ModalidadAjustePrecio,
+  TipoAjustePrecio,
+} from '../../enums/ajuste-precio.enum';
+import { ResultadoActualizacionMasiva } from '../../domain/interfaces/actualizar-precios-resultado.interface';
 @Injectable()
 export class ProductoService {
   private readonly logger = new Logger(ProductoService.name);
@@ -58,7 +67,7 @@ export class ProductoService {
 
   async create(dto: CreateProductoDto) {
     this.logger.log(
-      `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion} a: ${dto.denominacion}`,
+      `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion}`,
     );
 
     // Orquestar todas las validaciones
@@ -83,7 +92,7 @@ export class ProductoService {
   }
 
   async update(id: number, dto: UpdateProductoDto) {
-    this.logger.log(`Actualizandox  ${this.ENTITY_NAME} con ID: ${id}`);
+    this.logger.log(`Actualizando ${this.ENTITY_NAME} con ID: ${id}`);
 
     const { marca, linea, usuario } =
       await this.validarYPrepararActualizacion(id, dto);
@@ -110,7 +119,7 @@ export class ProductoService {
     skip: number,
     take: number,
   ): Promise<{ data: GetProductoDto[]; total: number }> {
-    this.logger.warn(`service`);
+    this.logger.log(`Buscando ${this.ENTITY_NAME} rápido con código: "${codigo}", exacto: ${exacto}, skip: ${skip}, take: ${take}`);
     const result = await this.repository.findByRapido(
       codigo,
       exacto,
@@ -137,8 +146,10 @@ export class ProductoService {
     conStock: boolean,
     skip: number,
     take: number,
+    lineaDenominacion?: string,
+    superLineaDenominacion?: string,
   ): Promise<{ data: GetProductoDto[]; total: number }> {
-    this.logger.warn(`service`);
+    this.logger.log(`Buscando ${this.ENTITY_NAME} con filtros — denominacion: "${denominacion}", skip: ${skip}, take: ${take}`);
     const result = await this.repository.findBy(
       denominacion,
       codigoProveedor,
@@ -150,6 +161,8 @@ export class ProductoService {
       conStock,
       skip,
       take,
+      lineaDenominacion,
+      superLineaDenominacion
     );
     return {
       data: result.data.map((producto) => {
@@ -183,7 +196,7 @@ export class ProductoService {
       throw new NotFoundException(
         `${this.ENTITY_NAME} con ID ${id} no encontrado.`,
       );
-    this.logger.log(`b1x`);
+    this.logger.log(`${this.ENTITY_NAME} con ID ${id} encontrado, mapeando a DTO`);
     return ProductoMapper.toDto(entity);
   }
 
@@ -236,7 +249,7 @@ export class ProductoService {
     take = 10,
   ): Promise<{ data: GetProductoDto[]; total: number }> {
     this.logger.log(
-      `  Buscando en srvice producto o ${denominacion}  skip=${skip}, take=${take}`,
+      `Buscando ${this.ENTITY_NAME} por denominación/código proveedor: "${denominacion}", skip=${skip}, take=${take}`,
     );
     const result =
       await this.repository.findByDenominacionCodigoProveedorFiltered(
@@ -244,7 +257,7 @@ export class ProductoService {
         skip,
         take,
       );
-    this.logger.log(result);
+    this.logger.log(`Búsqueda completada, total encontrados: ${result.total}`);
     return {
       data: result.data.map((producto) => {
         return ProductoMapper.toBusquedaDto(producto);
@@ -258,6 +271,14 @@ export class ProductoService {
   }
   async existsProductosActivosByLinea(lineaId: number): Promise<boolean> {
     return this.repository.existsProductosActivosByLinea(lineaId);
+  }
+
+  async actualizarPrecio(id: number, dto: UpdatePrecioDto) {
+    const usuario = await this.usuarioService.findOne(dto.usuarioId);
+    if (!usuario) {
+      throw new NotFoundException(`Usuario con ID ${dto.usuarioId} no encontrado.`);
+    }
+    return this.repository.actualizarPrecio(id, dto, usuario);
   }
 
 
@@ -436,5 +457,101 @@ export class ProductoService {
     return { marca, linea, usuario };
   }
 
+
+  // ========== CR-006: ACTUALIZACIÓN MASIVA DE PRECIOS ==========
+
+  async actualizarPreciosMasivo(
+    dto: ActualizarPreciosMasivoDto,
+  ): Promise<ResultadoActualizacionMasiva> {
+    this.logger.log(
+      `[CR-006] Iniciando actualización masiva de precios. Alcance: ${dto.alcance}, Tipo: ${dto.tipoAjuste}, Modalidad: ${dto.modalidad}, Valor: ${dto.valor}`,
+    );
+
+    // 1. Selección según alcance
+    let productos: Producto[];
+
+    if (dto.alcance === AlcanceAjustePrecio.GLOBAL) {
+      productos = await this.repository.findActivos();
+    } else {
+      if (!dto.lineaId) {
+        throw new BadRequestException(
+          'El ID de la línea es obligatorio cuando el alcance es por línea.',
+        );
+      }
+      productos = await this.repository.findActivosByLinea(dto.lineaId);
+    }
+
+    // 2. Validación de lote vacío
+    if (productos.length === 0) {
+      throw new NotFoundException(
+        'No se encontraron productos para el alcance seleccionado.',
+      );
+    }
+
+    this.logger.log(`[CR-006] ${productos.length} productos encontrados para procesar.`);
+
+    // 3. Procesamiento tolerante a fallos
+    const productosAActualizar: Producto[] = [];
+    const excluidos: ResultadoActualizacionMasiva['excluidos'] = [];
+
+    for (const producto of productos) {
+      try {
+        if (
+          dto.tipoAjuste === TipoAjustePrecio.AUMENTO &&
+          dto.modalidad === ModalidadAjustePrecio.MONTO
+        ) {
+          producto.aumentarPrecioPorMonto(dto.valor);
+        } else if (
+          dto.tipoAjuste === TipoAjustePrecio.AUMENTO &&
+          dto.modalidad === ModalidadAjustePrecio.PORCENTAJE
+        ) {
+          producto.aumentarPrecioPorPorcentaje(dto.valor);
+        } else if (
+          dto.tipoAjuste === TipoAjustePrecio.DISMINUCION &&
+          dto.modalidad === ModalidadAjustePrecio.MONTO
+        ) {
+          producto.disminuirPrecioPorMonto(dto.valor);
+        } else if (
+          dto.tipoAjuste === TipoAjustePrecio.DISMINUCION &&
+          dto.modalidad === ModalidadAjustePrecio.PORCENTAJE
+        ) {
+          producto.disminuirPrecioPorPorcentaje(dto.valor);
+        } else {
+          throw new InternalServerErrorException(
+            'Combinación de tipoAjuste y modalidad no soportada.',
+          );
+        }
+
+        productosAActualizar.push(producto);
+      } catch (error: unknown) {
+        const motivo =
+          error instanceof Error ? error.message : 'Error desconocido';
+        this.logger.warn(
+          `[CR-006] Producto ID ${producto.id} excluido: ${motivo}`,
+        );
+        excluidos.push({
+          id: producto.id,
+          denominacion: producto.denominacion,
+          motivo,
+        });
+      }
+    }
+
+    // 4. Persistencia en lote de los exitosos
+    if (productosAActualizar.length > 0) {
+      await this.repository.saveMany(productosAActualizar);
+    }
+
+    this.logger.log(
+      `[CR-006] Finalizado. Actualizados: ${productosAActualizar.length}, Excluidos: ${excluidos.length}`,
+    );
+
+    // 5. Retorno
+    return {
+      totalProcesados: productos.length,
+      actualizadosExitosamente: productosAActualizar.length,
+      excluidos,
+    };
+  }
 
 }

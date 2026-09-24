@@ -9,7 +9,7 @@ export class UpdateLineaDto extends PartialType(CreateLineaDto) {
 
     updatedAt: Date;
 
-    @IsNotEmpty({ message: 'El usuarioCreatedId es obligatorio.' })
-    @IsInt({ message: 'El usuarioCreatedId debe ser un número entero.' })
+    @IsNotEmpty({ message: 'El usuarioUpdatedId es obligatorio.' })
+    @IsInt({ message: 'El usuarioUpdatedId debe ser un número entero.' })
     usuarioUpdatedId: number;
 }

@@ -200,6 +200,7 @@ export class ProductoRepository implements IProductoRepository {
       lineaId,
       nuevaDenominacion,
     );
+  }
   async findActivos(): Promise<Producto[]> {
     return this.persistenceService.findActivos();
   }

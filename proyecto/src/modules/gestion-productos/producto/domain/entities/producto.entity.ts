@@ -178,6 +178,8 @@ export class Producto {
       throw new BadRequestException('El precio resultante debe ser mayor a 0.');
     }
     this.precio = nuevoPrecio;
+  }
+
   // ========== AJUSTE MASIVO DE PRECIOS ==========
 
   aumentarPrecioPorMonto(monto: number): void {

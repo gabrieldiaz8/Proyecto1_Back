@@ -15,7 +15,8 @@ export class LineaMapper {
       observacion: entity.observacion ?? '',
       sistema: entity.sistema,
       deletedAt: entity.deletedAt ? entity.deletedAt.toISOString() : null,
-
+      superLineaId: entity.superLineaId,
+      superLineaDenominacion: entity.superLinea ? entity.superLinea.denominacion : undefined // Para pasar únicamente el nombre
     };
   }
 }

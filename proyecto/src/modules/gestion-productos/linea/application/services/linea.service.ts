@@ -18,6 +18,7 @@ import { LineaMapper } from '../../mappers/linea.mapper';
 import { PoliticaEliminacionLinea } from '../../domain/services/politica-eliminacion-linea.service';
 import { IProductoRepository } from '../../../producto/domain/interfaces/producto.repository-interface';
 import { Linea } from '../../domain/entities/linea.entity';
+import { LineaValidationService } from '../../domain/services/linea-validation.service';
 
 @Injectable()
 export class LineaService {
@@ -32,6 +33,7 @@ export class LineaService {
     @Inject('IProductoRepository')
     private readonly productoRepository: IProductoRepository,
 
+    private readonly lineaValidation: LineaValidationService,
   ) { }
 
   private readonly ENTITY_NAME = 'Linea';
@@ -40,6 +42,7 @@ export class LineaService {
     this.logger.log(
       `Creando un nuevo ${this.ENTITY_NAME} con denominación: ${dto.denominacion} a: ${dto.denominacion}`,
     );
+    await this.lineaValidation.validateSuperLineaExists(dto.superLineaId);
     await this.checkDenominacionExists(dto.denominacion, 0);
 
 
@@ -59,9 +62,11 @@ export class LineaService {
 
     const linea = await this.findEntityById(id); // Verifica existencia
     ensureNotSistemaEntity(linea, 'Linea');
+    if (dto.superLineaId) {
+      await this.lineaValidation.validateSuperLineaExists(dto.superLineaId);
+    }
     if (dto.denominacion)
       await this.checkDenominacionExists(dto.denominacion, id);
-
 
     const entity = await this.repository.update(id, dto);
 

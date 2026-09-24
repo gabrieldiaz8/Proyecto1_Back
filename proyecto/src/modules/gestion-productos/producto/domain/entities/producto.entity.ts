@@ -8,6 +8,7 @@ import {
   Index,
   JoinColumn,
 } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { Linea } from '../../../linea/domain/entities/linea.entity';
 import { Marca } from '../../../marca/domain/entities/marca.entity';
 import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
@@ -108,7 +109,6 @@ export class Producto {
   @Column({ type: 'timestamp', nullable: true })
   fechaCostoDolar?: Date;
 
-
   @Column('boolean', { default: false })
   destacado?: boolean;
 
@@ -149,8 +149,7 @@ export class Producto {
   @Column({ type: 'int', nullable: true })
   lineaId?: number;
 
-
- // ==========  MARCA ==========
+  // ==========  MARCA ==========
   @ManyToOne(() => Marca, (marca) => marca.productos)
   @JoinColumn({ name: 'marca_id' })
   marca: Marca;
@@ -232,4 +231,61 @@ export class Producto {
 
   @Column({ type: 'text', nullable: true })
   codigoReferencia?: string | null;
+
+  cambiarPrecio(nuevoPrecio: number | undefined | null): void {
+    if (nuevoPrecio === undefined || nuevoPrecio === null) return;
+    if (nuevoPrecio <= 0) {
+      throw new BadRequestException('El precio resultante debe ser mayor a 0.');
+    }
+    this.precio = nuevoPrecio;
+  }
+
+  // ========== AJUSTE MASIVO DE PRECIOS ==========
+
+  aumentarPrecioPorMonto(monto: number): void {
+    this.validarValorAjuste(monto);
+    const nuevoPrecio = (this.precio ?? 0) + monto;
+    this.actualizarPrecioManteniendoMargen(nuevoPrecio);
+  }
+
+  disminuirPrecioPorMonto(monto: number): void {
+    this.validarValorAjuste(monto);
+    const nuevoPrecio = (this.precio ?? 0) - monto;
+    this.actualizarPrecioManteniendoMargen(nuevoPrecio);
+  }
+
+  aumentarPrecioPorPorcentaje(porcentaje: number): void {
+    this.validarValorAjuste(porcentaje);
+    const nuevoPrecio = (this.precio ?? 0) * (1 + porcentaje / 100);
+    this.actualizarPrecioManteniendoMargen(nuevoPrecio);
+  }
+
+  disminuirPrecioPorPorcentaje(porcentaje: number): void {
+    this.validarValorAjuste(porcentaje);
+    const nuevoPrecio = (this.precio ?? 0) * (1 - porcentaje / 100);
+    this.actualizarPrecioManteniendoMargen(nuevoPrecio);
+  }
+
+  private validarValorAjuste(valor: number): void {
+    this.asegurarValorPositivo(valor, 'El valor del ajuste debe ser mayor que 0.');
+  }
+
+  private actualizarPrecioManteniendoMargen(nuevoPrecio: number): void {
+    this.asegurarValorPositivo(nuevoPrecio, 'El precio final debe ser mayor que 0.');
+    const margenActual = this.porcentaje ?? 0;
+    const costoRecalculado =
+      margenActual === 0
+        ? nuevoPrecio
+        : nuevoPrecio / (1 + margenActual / 100);
+    this.asegurarValorPositivo(costoRecalculado, 'El costo recalculado debe ser mayor que 0.');
+    this.precio = nuevoPrecio;
+    this.costo = costoRecalculado;
+  }
+
+  private asegurarValorPositivo(valor: number, mensaje: string): void {
+    if (!Number.isFinite(valor) || valor <= 0) {
+      throw new Error(mensaje);
+    }
+  }
 }
+

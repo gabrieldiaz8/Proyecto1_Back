@@ -22,6 +22,8 @@ import { GeneradorDenominacionService } from './domain/services/generador-denomi
 import { ProductoDeletePolicy } from './application/policies/producto-delete.policy';
 
 
+import { HistorialPrecioModule } from '../historial-precio/historial-precio.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Producto]),
@@ -30,6 +32,7 @@ import { ProductoDeletePolicy } from './application/policies/producto-delete.pol
     forwardRef(() => MarcaModule),
     ProveedorModule,
     UsuarioModule,
+    HistorialPrecioModule,
   ],
 
   controllers: [ProductoController],

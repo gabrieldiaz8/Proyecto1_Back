@@ -182,4 +182,16 @@ export class ProductoRepository implements IProductoRepository {
    return this.persistenceService.existsByCodigoProveedor(codigoProveedor, excludeId);
   }
 
+  async findActivos(): Promise<Producto[]> {
+    return this.persistenceService.findActivos();
+  }
+
+  async findActivosByLinea(lineaId: number): Promise<Producto[]> {
+    return this.persistenceService.findActivosByLinea(lineaId);
+  }
+
+  async saveMany(productos: Producto[]): Promise<Producto[]> {
+    return this.persistenceService.saveMany(productos);
+  }
+
 }

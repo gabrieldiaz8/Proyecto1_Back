@@ -16,6 +16,7 @@ import {
 import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import { NormalizeDenominacionPipe } from 'src/modules/common/pipes/normalize-denominations.pipe';
 import { AuthGuard } from 'src/modules/gestion-usuario/auth/auth.guard';
 import { Roles } from 'src/modules/gestion-usuario/auth/roles.decorator';
@@ -53,7 +54,7 @@ export class ProductoController {
     this.logger.log(`Creando un nuevo ${this.ENTITY_NAME}...`);
     return this.service.create(createDto);
   }
-  
+
   @Get('find-all-for-marcas/select')
   @Roles('Root', 'Administrador', 'Empleado', 'Repartidor', 'Repositor', 'Vendedor')
   @UsePipes(NormalizeDenominacionSearchPipe)
@@ -93,6 +94,8 @@ export class ProductoController {
       conStock,
       skip,
       take,
+      lineaDenominacion,
+      superLineaDenominacion, 
     } = dto;
     return this.service.findBy(
       denominacion,
@@ -105,6 +108,8 @@ export class ProductoController {
       conStock,
       skip,
       take,
+      lineaDenominacion,
+      superLineaDenominacion
     );
   }
 
@@ -126,6 +131,16 @@ export class ProductoController {
   findOne(@Param('id', ParseIntPipe) id: number): Promise<ProductoDto> {
     this.logger.log(`Buscando  ${this.ENTITY_NAME} con ID: ${id}`);
     return this.service.findDtoById(+id);
+  }
+
+  @Put('precios/masivo')
+  @Roles('Root', 'Administrador')
+  @ApiOkResponse({
+    description: 'Actualización masiva de precios por porcentaje o monto.',
+  })
+  actualizarPreciosMasivo(@Body() dto: ActualizarPreciosMasivoDto) {
+    this.logger.log(`Solicitud de actualización masiva de precios recibida.`);
+    return this.service.actualizarPreciosMasivo(dto);
   }
 
   @Put(':id')

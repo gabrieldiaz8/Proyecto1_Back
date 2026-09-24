@@ -8,6 +8,7 @@ import {
   Index,
   JoinColumn,
 } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { Linea } from '../../../linea/domain/entities/linea.entity';
 import { Marca } from '../../../marca/domain/entities/marca.entity';
 import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
@@ -171,6 +172,12 @@ export class Producto {
   @Column({ type: 'text', nullable: true })
   codigoReferencia?: string | null;
 
+  cambiarPrecio(nuevoPrecio: number | undefined | null): void {
+    if (nuevoPrecio === undefined || nuevoPrecio === null) return;
+    if (nuevoPrecio <= 0) {
+      throw new BadRequestException('El precio resultante debe ser mayor a 0.');
+    }
+    this.precio = nuevoPrecio;
   // ========== AJUSTE MASIVO DE PRECIOS ==========
 
   aumentarPrecioPorMonto(monto: number): void {

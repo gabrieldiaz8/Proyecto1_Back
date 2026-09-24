@@ -182,6 +182,24 @@ export class ProductoRepository implements IProductoRepository {
    return this.persistenceService.existsByCodigoProveedor(codigoProveedor, excludeId);
   }
 
+  async regenerarDenominacionesPorMarca(
+    marcaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    return this.persistenceService.regenerarDenominacionesPorMarca(
+      marcaId,
+      nuevaDenominacion,
+    );
+  }
+
+  async regenerarDenominacionesPorLinea(
+    lineaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    return this.persistenceService.regenerarDenominacionesPorLinea(
+      lineaId,
+      nuevaDenominacion,
+    );
   async findActivos(): Promise<Producto[]> {
     return this.persistenceService.findActivos();
   }

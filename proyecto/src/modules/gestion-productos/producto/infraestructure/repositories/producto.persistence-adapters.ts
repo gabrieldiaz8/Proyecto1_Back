@@ -14,6 +14,7 @@ import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
 import { ProductoMapper } from '../../mappers/producto.mapper';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
 import { IHistorialPrecioRepository } from 'src/modules/gestion-productos/historial-precio/domain/interfaces/historial-precio.repository.interface';
 
 
@@ -28,6 +29,7 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     private readonly repository: Repository<Producto>,
     private readonly dataSource: DataSource,
     @Inject('UnitOfWork') public readonly uow: IUnitOfWork,
+    private readonly generadorDenominacionService: GeneradorDenominacionService,
     @Inject('IHistorialPrecioRepository')
     private readonly historialPrecioRepository: IHistorialPrecioRepository,
   ) { }
@@ -551,6 +553,88 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     } catch (error) {
       this.logger.error(
         `Error verificando existencia de denominación:}`,
+      );
+      throw new DatabaseConnectionException(
+        'Error al conectar con la base de datos.',
+      );
+    }
+  }
+
+  async regenerarDenominacionesPorMarca(
+    marcaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    try {
+      const productos = await this.repository
+        .createQueryBuilder('producto')
+        .leftJoinAndSelect('producto.linea', 'linea')
+        .where('producto.marca_id = :marcaId', { marcaId })
+        .andWhere('producto.denominacionManual = :manual', { manual: false })
+        .andWhere('producto.deletedAt IS NULL')
+        .getMany();
+
+      for (const producto of productos) {
+        producto.denominacion =
+          this.generadorDenominacionService.generarDenominacion(
+            nuevaDenominacion,
+            producto.linea?.denominacion ?? '',
+            producto.getPresentacionDescripcion() ?? undefined,
+          );
+      }
+
+      if (productos.length > 0) {
+        await this.repository.save(productos);
+      }
+
+      this.logger.log(
+        `[${this.ENTITY_NAME}] Denominaciones regeneradas por Marca ${marcaId}: ${productos.length}`,
+      );
+      return productos.length;
+    } catch (error) {
+      this.logger.error(
+        `Error regenerando denominaciones por Marca ${marcaId}:`,
+        error,
+      );
+      throw new DatabaseConnectionException(
+        'Error al conectar con la base de datos.',
+      );
+    }
+  }
+
+  async regenerarDenominacionesPorLinea(
+    lineaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    try {
+      const productos = await this.repository
+        .createQueryBuilder('producto')
+        .leftJoinAndSelect('producto.marca', 'marca')
+        .where('producto.linea_id = :lineaId', { lineaId })
+        .andWhere('producto.denominacionManual = :manual', { manual: false })
+        .andWhere('producto.deletedAt IS NULL')
+        .getMany();
+
+      for (const producto of productos) {
+        producto.denominacion =
+          this.generadorDenominacionService.generarDenominacion(
+            producto.marca?.denominacion ?? '',
+            nuevaDenominacion,
+            producto.getPresentacionDescripcion() ?? undefined,
+          );
+      }
+
+      if (productos.length > 0) {
+        await this.repository.save(productos);
+      }
+
+      this.logger.log(
+        `[${this.ENTITY_NAME}] Denominaciones regeneradas por Línea ${lineaId}: ${productos.length}`,
+      );
+      return productos.length;
+    } catch (error) {
+      this.logger.error(
+        `Error regenerando denominaciones por Línea ${lineaId}:`,
+        error,
       );
       throw new DatabaseConnectionException(
         'Error al conectar con la base de datos.',

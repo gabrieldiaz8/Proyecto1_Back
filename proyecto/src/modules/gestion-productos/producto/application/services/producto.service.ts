@@ -30,6 +30,8 @@ import { ProductoUniquenessValidator } from '../../infraestructure/validators/pr
 import { UsuarioValidator } from 'src/modules/common/utils/validation/usuario-validator';
 import { ProductoDeletePolicy } from '../policies/producto-delete.policy';
 import { UnidadMedida } from '../../domain/enums/unidad-medida.enum';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { Presentacion } from '../../domain/value-objects/presentacion.vo';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import {
   AlcanceAjustePrecio,
@@ -61,6 +63,8 @@ export class ProductoService {
 
     private readonly productoDeletePolicy: ProductoDeletePolicy,
 
+    private readonly generadorDenominacionService: GeneradorDenominacionService,
+
   ) { }
 
   private readonly ENTITY_NAME = 'Producto';
@@ -71,13 +75,11 @@ export class ProductoService {
     );
 
     // Orquestar todas las validaciones
-    const { marca, linea, usuario } =
+    const { data, marca, linea, usuario } =
       await this.validarYPrepararCreacion(dto);
 
-
-
     const entity = await this.repository.create(
-      dto,
+      data,
       linea,
       marca,
 
@@ -94,12 +96,12 @@ export class ProductoService {
   async update(id: number, dto: UpdateProductoDto) {
     this.logger.log(`Actualizando ${this.ENTITY_NAME} con ID: ${id}`);
 
-    const { marca, linea, usuario } =
+    const { data, marca, linea, usuario } =
       await this.validarYPrepararActualizacion(id, dto);
 
     const entity = await this.repository.update(
       id,
-      dto,
+      data,
       linea,
       marca,
 
@@ -336,9 +338,29 @@ export class ProductoService {
    * @private
    */
   private async validarYPrepararCreacion(dto: CreateProductoDto) {
-    // Validar datos  (Domain - sin DB)
+    // 1 Validar entidades relacionadas existen y obtener nombres (Infrastructure - DB)
+    const { marca, linea } =
+      await this.relatedEntitiesValidator.validarYObtenerEntidadesRelacionadas(
+        dto.marcaId,
+        dto.lineaId,
+      );
+
+    // 2 Resolver denominación (manual o automática)
+    const denominacionManual = this.denominacionEsManual(dto.denominacion);
+    const denominacion = denominacionManual
+      ? (dto.denominacion as string)
+      : this.generadorDenominacionService.generarDenominacion(
+          marca.denominacion,
+          linea.denominacion,
+          this.obtenerPresentacionDescripcion(
+            dto.presentacionCantidad,
+            dto.presentacionUnidadMedida,
+          ),
+        );
+
+    // 3 Validar datos intrínsecos (Domain - sin DB)
     this.intrinsicValidationService.validarDatosBasicos({
-      denominacion: dto.denominacion,
+      denominacion,
       marcaId: dto.marcaId,
       lineaId: dto.lineaId,
       alicuotaIva: dto.alicuotaIva,
@@ -346,8 +368,8 @@ export class ProductoService {
       presentacionUnidadMedida: dto.presentacionUnidadMedida,
     });
 
-    // Validar unicidad (Infrastructure - DB)
-    await this.uniquenessValidator.validarDenominacionUnica(dto.denominacion);
+    // 4 Validar unicidad (Infrastructure - DB)
+    await this.uniquenessValidator.validarDenominacionUnica(denominacion);
 
     if (dto.codigoProveedor) {
       await this.uniquenessValidator.validarCodigoProveedorUnico(
@@ -355,28 +377,21 @@ export class ProductoService {
         0,
       );
     }
-    // 3 Validar entidades relacionadas existen (Infrastructure - DB)
-    const { marca, linea, } =
-      await this.relatedEntitiesValidator.validarYObtenerEntidadesRelacionadas(
-        dto.marcaId,
-        dto.lineaId,
 
-      );
-
-    //  Validar reglas de negocio sobre entidades (Domain)
+    // 5 Validar reglas de negocio sobre entidades (Domain)
     this.validationService.validarEntidadesRelacionadas(
       marca,
       linea,
-
     );
 
-
-    //  Validar usuario existe (Infrastructure)
+    // 6 Validar usuario existe (Infrastructure)
     const usuario = await this.usuarioValidator.validarUsuarioExiste(
       dto.usuarioCreatedId,
     );
 
-    return { marca, linea, usuario };
+    const data = { ...dto, denominacion, denominacionManual };
+
+    return { data, marca, linea, usuario };
   }
   /**
    * Orquesta todas las validaciones necesarias para actualizar un producto
@@ -416,9 +431,37 @@ export class ProductoService {
         productoActual.presentacionUnidadMedida ?? undefined;
     }
 
+    // 1 Validar entidades relacionadas existen y obtener nombres (Infrastructure - DB)
+    const { marca, linea } =
+      await this.relatedEntitiesValidator.validarYObtenerEntidadesRelacionadas(
+        dto.marcaId ?? productoActual.marcaId,
+        dto.lineaId ?? productoActual.lineaId,
+      );
+
+    // 2 Resolver denominación (manual o automática)
+    const denominacionManual = this.denominacionEsManual(dto.denominacion)
+      ? true
+      : productoActual.denominacionManual;
+
+    let denominacion = this.denominacionEsManual(dto.denominacion)
+      ? (dto.denominacion as string)
+      : productoActual.denominacion;
+
+    if (!denominacionManual) {
+      denominacion = this.generadorDenominacionService.generarDenominacion(
+        marca.denominacion,
+        linea.denominacion,
+        this.obtenerPresentacionDescripcion(
+          presentacionCantidad,
+          presentacionUnidadMedida,
+        ),
+      );
+    }
+
+    // 3 Validar datos intrínsecos
     //  Validar datos intrínsecos
     this.intrinsicValidationService.validarDatosBasicos({
-      denominacion: dto.denominacion ?? productoActual.denominacion,
+      denominacion,
       marcaId: dto.marcaId ?? productoActual.marcaId,
       lineaId: dto.lineaId ?? productoActual.lineaId,
       alicuotaIva: dto.alicuotaIva ?? productoActual.alicuotaIva,
@@ -426,7 +469,7 @@ export class ProductoService {
       presentacionUnidadMedida,
     });
 
-    // Validar unicidad (excluyendo el ID actual)
+    // 4 Validar unicidad (excluyendo el ID actual)
     if (dto.denominacion) {
       await this.uniquenessValidator.validarDenominacionUnica(
         dto.denominacion,
@@ -434,27 +477,34 @@ export class ProductoService {
       );
     }
 
-    // Validar entidades relacionadas
-    const { marca, linea, } =
-      await this.relatedEntitiesValidator.validarYObtenerEntidadesRelacionadas(
-        dto.marcaId ?? productoActual.marcaId,
-        dto.lineaId ?? productoActual.lineaId,
-
-      );
-
-    //  Validar reglas de negocio
+    // 5 Validar reglas de negocio sobre entidades
     this.validationService.validarEntidadesRelacionadas(
       marca,
       linea,
-
     );
 
-    // 5 Validar usuario
+    // 6 Validar usuario
     const usuario = await this.usuarioValidator.validarUsuarioExiste(
       dto.usuarioUpdatedId,
     );
 
-    return { marca, linea, usuario };
+    const data = { ...dto, denominacion, denominacionManual };
+
+    return { data, marca, linea, usuario };
+  }
+
+  private denominacionEsManual(denominacion?: string): boolean {
+    return !!(denominacion && denominacion.trim().length > 0);
+  }
+
+  private obtenerPresentacionDescripcion(
+    cantidad?: number | null,
+    unidadMedida?: UnidadMedida | null,
+  ): string | undefined {
+    if (cantidad == null || unidadMedida == null) {
+      return undefined;
+    }
+    return new Presentacion(cantidad, unidadMedida).getDescripcionFormateada();
   }
 
 

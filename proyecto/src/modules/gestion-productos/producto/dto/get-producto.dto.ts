@@ -30,6 +30,14 @@ export class GetProductoDto {
   denominacion: string;
 
   @ApiProperty({
+    example: false,
+    description:
+      'Indica si la denominación fue asignada manualmente (true) o generada automáticamente (false).',
+  })
+  @IsBoolean()
+  denominacionManual: boolean;
+
+  @ApiProperty({
     example: '1158 Caja de tornillos',
     description:
       'Codigo proveedor Denominación o nombre del producto. Esta formado por la linea y la marca',

@@ -31,6 +31,14 @@ export class ProductoDto {
   @IsString()
   denominacion: string;
 
+  @ApiProperty({
+    example: false,
+    description:
+      'Indica si la denominación fue asignada manualmente (true) o generada automáticamente (false).',
+  })
+  @IsBoolean()
+  denominacionManual: boolean;
+
   @ApiProperty()
   @IsString()
   observacion?: string;

@@ -29,6 +29,7 @@ import { ProductoRelatedEntitiesValidator } from '../../infraestructure/validato
 import { ProductoUniquenessValidator } from '../../infraestructure/validators/producto-uniqueness.validator.ts';
 import { UsuarioValidator } from 'src/modules/common/utils/validation/usuario-validator';
 import { ProductoDeletePolicy } from '../policies/producto-delete.policy';
+import { UnidadMedida } from '../../domain/enums/unidad-medida.enum';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import {
   AlcanceAjustePrecio,
@@ -341,6 +342,8 @@ export class ProductoService {
       marcaId: dto.marcaId,
       lineaId: dto.lineaId,
       alicuotaIva: dto.alicuotaIva,
+      presentacionCantidad: dto.presentacionCantidad,
+      presentacionUnidadMedida: dto.presentacionUnidadMedida,
     });
 
     // Validar unicidad (Infrastructure - DB)
@@ -397,13 +400,30 @@ export class ProductoService {
       throw new InternalServerErrorException('Producto en estado inválido');
     }
 
+    // Presentación: si no se envió se conserva el valor actual.
+    // Permite limpiarla explícitamente enviando null en ambos campos.
+    let presentacionCantidad: number | null | undefined =
+      dto.presentacionCantidad;
+    let presentacionUnidadMedida: UnidadMedida | null | undefined =
+      dto.presentacionUnidadMedida;
+
+    if (
+      presentacionCantidad === undefined &&
+      presentacionUnidadMedida === undefined
+    ) {
+      presentacionCantidad = productoActual.presentacionCantidad ?? undefined;
+      presentacionUnidadMedida =
+        productoActual.presentacionUnidadMedida ?? undefined;
+    }
+
     //  Validar datos intrínsecos
     this.intrinsicValidationService.validarDatosBasicos({
       denominacion: dto.denominacion ?? productoActual.denominacion,
       marcaId: dto.marcaId ?? productoActual.marcaId,
       lineaId: dto.lineaId ?? productoActual.lineaId,
       alicuotaIva: dto.alicuotaIva ?? productoActual.alicuotaIva,
-
+      presentacionCantidad,
+      presentacionUnidadMedida,
     });
 
     // Validar unicidad (excluyendo el ID actual)

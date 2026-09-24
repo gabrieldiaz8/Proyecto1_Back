@@ -459,6 +459,7 @@ export class ProductoService {
     }
 
     // 3 Validar datos intrínsecos
+    //  Validar datos intrínsecos
     this.intrinsicValidationService.validarDatosBasicos({
       denominacion,
       marcaId: dto.marcaId ?? productoActual.marcaId,

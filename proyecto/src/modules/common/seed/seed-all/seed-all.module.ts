@@ -21,6 +21,7 @@ import { Cliente } from 'src/modules/organizacion/cliente/domain/entities/client
 import { CondicionIva } from 'src/modules/gutil/condicion-iva/domain/entities/condicion-iva.entity';
 import { Proveedor } from 'src/modules/organizacion/proveedor/domain/entities/proveedor.entity';
 import { AlicuotaIva } from 'src/modules/gutil/alicuota-iva/domain/entities/alicuota-iva.entity';
+import { SuperLinea } from 'src/modules/gestion-productos/super-linea/domain/entities/super-linea.entity';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AlicuotaIva } from 'src/modules/gutil/alicuota-iva/domain/entities/alic
       ConfiguracionSistema,
 
       Personal,
+      SuperLinea,
 
       AlicuotaIva,
 

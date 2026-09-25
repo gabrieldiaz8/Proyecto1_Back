@@ -10,7 +10,7 @@ async function bootstrap() {
 
   // Configuración nativa de CORS en NestJS
   app.enableCors({
-    origin: 'https://proyecto1-front-ez30.onrender.com',
+    origin: ['http://localhost:5173', 'https://proyecto1-front-ez30.onrender.com'],
     credentials: true,
   });
 

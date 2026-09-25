@@ -20,6 +20,8 @@ export interface IProductoRepository {
     conStock: boolean,
     skip: number,
     take: number,
+    lineaDenominacion?: string,
+    superLineaDenominacion?: string,
   ): Promise<{ data: Producto[]; total: number }>;
 
   findByRapido(
@@ -61,6 +63,16 @@ export interface IProductoRepository {
   existsByCodigoProveedor(codigoProveedor: string, excludeId: number): Promise<boolean>;
   existsProductosActivosByMarca(marcaId: number): Promise<boolean>;
   existsProductosActivosByLinea(lineaId: number): Promise<boolean>;
+
+  regenerarDenominacionesPorMarca(
+    marcaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number>;
+
+  regenerarDenominacionesPorLinea(
+    lineaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number>;
 
   findByIds(ids: number[]): Promise<Producto[]>;
 

@@ -1,5 +1,7 @@
 // domain/services/producto-intrinsic-validation.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { UnidadMedida } from '../enums/unidad-medida.enum';
+import { Presentacion } from '../value-objects/presentacion.vo';
 
 @Injectable()
 export class ProductoIntrinsicValidationService {
@@ -11,6 +13,8 @@ export class ProductoIntrinsicValidationService {
     marcaId: number;
     lineaId: number;
     alicuotaIva?: number;
+    presentacionCantidad?: number | null;
+    presentacionUnidadMedida?: UnidadMedida | null;
   }): void {
     this.validarDenominacion(datos.denominacion);
     this.validarIds(datos.marcaId, datos.lineaId);
@@ -18,6 +22,38 @@ export class ProductoIntrinsicValidationService {
     if (datos.alicuotaIva !== undefined) {
       this.validarAlicuotaIva(datos.alicuotaIva);
     }
+
+    if (
+      datos.presentacionCantidad !== undefined ||
+      datos.presentacionUnidadMedida !== undefined
+    ) {
+      this.validarPresentacion(
+        datos.presentacionCantidad,
+        datos.presentacionUnidadMedida,
+      );
+    }
+  }
+
+  private validarPresentacion(
+    cantidad?: number | null,
+    unidadMedida?: UnidadMedida | null,
+  ): void {
+    const envioIncompleto =
+      (cantidad === undefined || cantidad === null) !==
+        (unidadMedida === undefined || unidadMedida === null) ||
+      (cantidad === null) !== (unidadMedida === null);
+
+    if (envioIncompleto) {
+      throw new BadRequestException(
+        'La cantidad y unidad de medida de la presentación deben enviarse juntas',
+      );
+    }
+
+    if (cantidad === null || unidadMedida === null) {
+      return; // borrado explícito de la presentación
+    }
+
+    new Presentacion(cantidad as number, unidadMedida as UnidadMedida);
   }
 
   private validarDenominacion(denominacion: string): void {

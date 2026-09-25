@@ -15,14 +15,12 @@ import {
 
 import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdateProductoDto } from '../../dto/update-producto.dto';
+import { UpdatePrecioDto } from '../../dto/update-precio.dto';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import { NormalizeDenominacionPipe } from 'src/modules/common/pipes/normalize-denominations.pipe';
 import { AuthGuard } from 'src/modules/gestion-usuario/auth/auth.guard';
 import { Roles } from 'src/modules/gestion-usuario/auth/roles.decorator';
-import {
-  ApiOkResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { NormalizeCodigoProveedorPipe } from 'src/modules/common/pipes/normalize-codigo-proveedor.pipe';
 import { GetProductoDto } from '../../dto/get-producto.dto';
 import { SearchProductoPaginationWithDto } from '../../dto/search-producto-pagination-with.dto';
@@ -32,6 +30,8 @@ import { NormalizeDenominacionSearchPipe } from 'src/modules/common/pipes/normal
 import { DenominacionBusquedaDto } from 'src/modules/common/dto/denominacion-busqueda.dto';
 import { SearchProductoRapidoDto } from '../../dto/search-producto-rapido.dto';
 import { ProductoService } from '../services/producto.service';
+import { HistorialPrecioService } from 'src/modules/gestion-productos/historial-precio/application/services/historial-precio.service';
+import { SearchHistorialPrecioDto } from 'src/modules/gestion-productos/historial-precio/dto/search-historial-precio.dto';
 
 
 @ApiTags('Gestion Productos')
@@ -39,7 +39,10 @@ import { ProductoService } from '../services/producto.service';
 @UseGuards(AuthGuard)
 export class ProductoController {
   private readonly logger = new Logger(ProductoController.name);
-  constructor(private readonly service: ProductoService) { }
+  constructor(
+    private readonly service: ProductoService,
+    private readonly historialPrecioService: HistorialPrecioService,
+  ) {}
 
   private readonly ENTITY_NAME = 'Producto';
 
@@ -53,30 +56,15 @@ export class ProductoController {
   }
 
   @Get('find-all-for-marcas/select')
-  @Roles(
-    'Root',
-    'Administrador',
-    'Empleado',
-    'Repartidor',
-    'Repositor',
-    'Vendedor',
-  )
+  @Roles('Root', 'Administrador', 'Empleado', 'Repartidor', 'Repositor', 'Vendedor')
   @UsePipes(NormalizeDenominacionSearchPipe)
   async findAllMarcasFor(@Query() dto: DenominacionBusquedaDto) {
     const { denominacion = '' } = dto;
     return this.service.findAllForMarcas(denominacion);
   }
 
-
   @Get('find-all-for-lineas/select')
-  @Roles(
-    'Root',
-    'Administrador',
-    'Empleado',
-    'Repartidor',
-    'Repositor',
-    'Vendedor',
-  )
+  @Roles('Root', 'Administrador', 'Empleado', 'Repartidor', 'Repositor', 'Vendedor')
   @UsePipes(NormalizeDenominacionSearchPipe)
   async findAllLineasFor(@Query() dto: DenominacionBusquedaDto) {
     const { denominacion = '' } = dto;
@@ -84,14 +72,7 @@ export class ProductoController {
   }
 
   @Get('search-by-rapido')
-  @Roles(
-    'Root',
-    'Administrador',
-    'Empleado',
-    'Vendedor',
-    'Repartidor',
-    'Repositor',
-  )
+  @Roles('Root', 'Administrador', 'Empleado', 'Vendedor', 'Repartidor', 'Repositor')
   @UsePipes(NormalizeDenominacionSearchPipe)
   async searchRapido(@Query() dto: SearchProductoRapidoDto) {
     const { exacto, codigo, skip, take } = dto;
@@ -99,14 +80,7 @@ export class ProductoController {
   }
 
   @Get('search-by')
-  @Roles(
-    'Root',
-    'Administrador',
-    'Empleado',
-    'Vendedor',
-    'Repartidor',
-    'Repositor',
-  )
+  @Roles('Root', 'Administrador', 'Empleado', 'Vendedor', 'Repartidor', 'Repositor')
   @UsePipes(NormalizeDenominacionSearchPipe)
   async search(@Query() dto: SearchProductoPaginationWithDto) {
     const {
@@ -120,6 +94,8 @@ export class ProductoController {
       conStock,
       skip,
       take,
+      lineaDenominacion,
+      superLineaDenominacion, 
     } = dto;
     return this.service.findBy(
       denominacion,
@@ -132,6 +108,8 @@ export class ProductoController {
       conStock,
       skip,
       take,
+      lineaDenominacion,
+      superLineaDenominacion
     );
   }
 
@@ -140,7 +118,6 @@ export class ProductoController {
   async getMarcaDelProducto(@Param('id', ParseIntPipe) id: number) {
     return this.service.buscarMarcaDesdeProducto(id);
   }
-
 
   @Get('linea/:id')
   @Roles('Root', 'Administrador', 'Empleado')
@@ -178,6 +155,16 @@ export class ProductoController {
     return this.service.update(id, updateDto);
   }
 
+  @Put(':id/precio')
+  @Roles('Root', 'Administrador', 'Empleado')
+  actualizarPrecio(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePrecioDto,
+  ) {
+    this.logger.log(`Actualizando precio de ${this.ENTITY_NAME} con ID: ${id}`);
+    return this.service.actualizarPrecio(id, dto);
+  }
+
   @Delete(':id')
   @Roles('Root', 'Administrador', 'Empleado')
   remove(
@@ -190,17 +177,23 @@ export class ProductoController {
     return this.service.remove(id, usuarioId);
   }
 
-
   @Get(':id/audit')
   @Roles('Root', 'Administrador', 'Empleado')
-  @ApiOkResponse({
-    description: 'Informacion de auditoria',
-    type: AuditoriaDto,
-  })
+  @ApiOkResponse({ description: 'Informacion de auditoria', type: AuditoriaDto })
   async findByIdConAuditoria(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<AuditoriaDto> {
     const data = await this.service.findByIdConAuditoria(id);
     return data;
+  }
+
+  @Get(':id/historial-precios')
+  @Roles('Root', 'Administrador', 'Empleado')
+  findHistorialPrecios(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() paginationDto: SearchHistorialPrecioDto,
+  ) {
+    this.logger.log(`Consultando historial de precios de ${this.ENTITY_NAME} con ID: ${id}`);
+    return this.historialPrecioService.findByProducto(id, paginationDto.skip, paginationDto.take);
   }
 }

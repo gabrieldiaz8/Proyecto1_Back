@@ -25,8 +25,12 @@ export class ProductoMapper {
     linea: Linea,
     marca: Marca,
     usuario: Usuario,
+    denominacionResuelta?: string,
+    denominacionManual?: boolean,
   ): Producto {
-    const denominacion = new Denominacion(dto.denominacion);
+    const denominacion = new Denominacion(
+      denominacionResuelta ?? dto.denominacion,
+    );
     const costo = new Costo(dto.costo ?? 0);
     const porcentaje = new Porcentaje(dto.porcentaje ?? 0);
 
@@ -59,6 +63,9 @@ export class ProductoMapper {
       imagen: undefined, // No está en el DTO
       ubicacion: dto.ubicacion,
       sistema: 0,
+      denominacionManual,
+      presentacionCantidad: dto.presentacionCantidad,
+      presentacionUnidadMedida: dto.presentacionUnidadMedida,
     });
   }
 
@@ -67,12 +74,15 @@ export class ProductoMapper {
     linea: Linea,
     marca: Marca,
     usuario: Usuario,
+    denominacionResuelta?: string,
+    denominacionManual?: boolean,
   ) {
     return {
       denominacion:
-        dto.denominacion !== undefined
-          ? new Denominacion(dto.denominacion)
+        (denominacionResuelta ?? dto.denominacion) !== undefined
+          ? new Denominacion(denominacionResuelta ?? dto.denominacion)
           : undefined,
+      denominacionManual,
       costo: dto.costo !== undefined ? new Costo(dto.costo) : undefined,
       porcentaje:
         dto.porcentaje !== undefined ? new Porcentaje(dto.porcentaje) : undefined,
@@ -100,6 +110,8 @@ export class ProductoMapper {
       cantidadPorPack: dto.cantidadPorPack,
       imagen: undefined, // No está en el DTO
       ubicacion: dto.ubicacion,
+      presentacionCantidad: dto.presentacionCantidad,
+      presentacionUnidadMedida: dto.presentacionUnidadMedida,
     };
   }
 
@@ -110,6 +122,7 @@ export class ProductoMapper {
     return {
       id: entity.id,
       denominacion: entity.denominacion,
+      denominacionManual: entity.denominacionManual,
       observacion: entity.observacion ?? '',
       codigoProveedorDenominacion:
         entity.codigoProveedor + ' - ' + entity.denominacion,
@@ -131,6 +144,10 @@ export class ProductoMapper {
       stockMinimo: entity.stockMinimo,
       utilizaPack: entity.utilizaPack,
       cantidadPorPack: entity.cantidadPorPack ?? 0,
+      presentacionCantidad: entity.presentacionCantidad ?? undefined,
+      presentacionUnidadMedida:
+        (entity.presentacionUnidadMedida as GetProductoDto['presentacionUnidadMedida']) ??
+        undefined,
       sistema: entity.sistema,
       codigoReferencia: entity.codigoReferencia ?? '',
 
@@ -162,6 +179,7 @@ export class ProductoMapper {
     return {
       id: entity.id,
       denominacion: entity.denominacion,
+      denominacionManual: entity.denominacionManual,
       observacion: entity.observacion ?? '',
       codigoProveedor: entity.codigoProveedor ?? '',
       codigoBarra: entity.codigoBarra ?? '',
@@ -185,6 +203,10 @@ export class ProductoMapper {
       stockMinimo: entity.stockMinimo ?? 0,
       utilizaPack: entity.utilizaPack ?? false,
       cantidadPorPack: entity.cantidadPorPack ?? 0,
+      presentacionCantidad: entity.presentacionCantidad ?? undefined,
+      presentacionUnidadMedida:
+        (entity.presentacionUnidadMedida as ProductoDto['presentacionUnidadMedida']) ??
+        undefined,
       sistema: entity.sistema,
       codigoReferencia: entity.codigoReferencia ?? '',
 

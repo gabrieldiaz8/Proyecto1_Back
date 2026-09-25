@@ -6,11 +6,14 @@ import {
   IsNumber,
   IsInt,
   IsEnum,
+  IsPositive,
   ValidateNested,
 } from 'class-validator';
 import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ReferenciaDto } from 'src/modules/common/dto/referencia.dto';
+import { IsOptional } from 'class-validator';
+import { UnidadMedida } from '../domain/enums/unidad-medida.enum';
 /*
 Se Utiliza cuando se necesita la entidad producto
 */
@@ -27,6 +30,14 @@ export class ProductoDto {
   })
   @IsString()
   denominacion: string;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'Indica si la denominación fue asignada manualmente (true) o generada automáticamente (false).',
+  })
+  @IsBoolean()
+  denominacionManual: boolean;
 
   @ApiProperty()
   @IsString()
@@ -140,7 +151,23 @@ export class ProductoDto {
 
   @ApiPropertyOptional()
   @IsInt()
+  @IsOptional()
   cantidadPorPack: number;
+
+  @ApiPropertyOptional({ example: 750, description: 'Cantidad de la presentación del producto.' })
+  @IsNumber()
+  @IsPositive()
+  @IsOptional()
+  presentacionCantidad?: number;
+
+  @ApiPropertyOptional({
+    enum: UnidadMedida,
+    enumName: 'UnidadMedida',
+    description: 'Unidad de medida de la presentación del producto.',
+  })
+  @IsEnum(UnidadMedida)
+  @IsOptional()
+  presentacionUnidadMedida?: UnidadMedida;
 
   @ApiProperty({ example: 123 })
   @Type(() => Number)

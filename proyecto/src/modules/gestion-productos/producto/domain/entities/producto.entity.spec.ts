@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Producto } from './producto.entity';
 import { Denominacion } from '../value-objects/denominacion.vo';
 import { Costo } from '../value-objects/costo.vo';
@@ -6,6 +7,40 @@ import { Linea } from '../../../linea/domain/entities/linea.entity';
 import { Marca } from '../../../marca/domain/entities/marca.entity';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
+
+describe('Producto.cambiarPrecio', () => {
+  let producto: Producto;
+
+  beforeEach(() => {
+    producto = new Producto();
+    producto.precio = 100;
+  });
+
+  it('asigna el nuevo precio cuando es válido (> 0)', () => {
+    producto.cambiarPrecio(150);
+    expect(producto.precio).toBe(150);
+  });
+
+  it('lanza BadRequestException cuando el precio es 0 y no modifica el precio anterior', () => {
+    expect(() => producto.cambiarPrecio(0)).toThrow(BadRequestException);
+    expect(producto.precio).toBe(100);
+  });
+
+  it('lanza BadRequestException cuando el precio es negativo y no modifica el precio anterior', () => {
+    expect(() => producto.cambiarPrecio(-10)).toThrow(BadRequestException);
+    expect(producto.precio).toBe(100);
+  });
+
+  it('no lanza ni modifica el precio cuando recibe undefined', () => {
+    producto.cambiarPrecio(undefined);
+    expect(producto.precio).toBe(100);
+  });
+
+  it('no lanza ni modifica el precio cuando recibe null', () => {
+    producto.cambiarPrecio(null);
+    expect(producto.precio).toBe(100);
+  });
+});
 
 describe('Producto - métodos de ajuste de precio (CR-006)', () => {
   /**
@@ -250,6 +285,16 @@ describe('Producto - métodos de ajuste de precio (CR-006)', () => {
       const producto = crearProducto(undefined, 25);
       expect(() => producto.aumentarPrecioPorPorcentaje(10)).toThrow(
         'El precio final debe ser mayor que 0.',
+      );
+    });
+
+    it('debería lanzar error si el costo recalculado resulta <= 0 por un margen negativo extremo', () => {
+      // porcentaje = -200 → divisor = 1 + (-200/100) = -1
+      // nuevoPrecio = 100 + 1 = 101 (pasa la guardia de precio positivo)
+      // costoRecalculado = 101 / -1 = -101 → debe lanzar el error del COSTO, no del precio
+      const producto = crearProducto(100, -200);
+      expect(() => producto.aumentarPrecioPorMonto(1)).toThrow(
+        'El costo recalculado debe ser mayor que 0.',
       );
     });
   });

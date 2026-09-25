@@ -8,6 +8,7 @@ import {
   Index,
   JoinColumn,
 } from 'typeorm';
+import { BadRequestException } from '@nestjs/common';
 import { Linea } from '../../../linea/domain/entities/linea.entity';
 import { Marca } from '../../../marca/domain/entities/marca.entity';
 import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
@@ -22,6 +23,8 @@ import { Denominacion } from '../value-objects/denominacion.vo';
 import { Costo } from '../value-objects/costo.vo';
 import { Porcentaje } from '../value-objects/porcentaje.vo';
 import { Precio } from '../value-objects/precio.vo';
+import { UnidadMedida } from '../enums/unidad-medida.enum';
+import { Presentacion } from '../value-objects/presentacion.vo';
 
 @Entity('producto')
 export class Producto {
@@ -32,6 +35,13 @@ export class Producto {
   @ApiProperty()
   @Column({ type: 'text' })
   denominacion: string;
+
+  @Column({ name: 'denominacion_manual', type: 'boolean', default: false })
+  denominacionManual: boolean;
+
+  establecerDenominacionManual(manual: boolean): void {
+    this.denominacionManual = manual;
+  }
 
   @Index()
   @Column({ type: 'varchar', length: 255, nullable: true })
@@ -158,6 +168,57 @@ export class Producto {
   @Column({ type: 'int', nullable: true })
   cantidadPorPack: number | null;
 
+  // ========== PRESENTACION ==========
+  @Column({
+    name: 'presentacion_cantidad',
+    type: 'decimal',
+    precision: 12,
+    scale: 3,
+    nullable: true,
+    transformer: {
+      to: (value: number | string | null | undefined): string | null =>
+        value === null || value === undefined ? null : value.toString(),
+      from: (value: string | null): number | null =>
+        value === null ? null : Number(value),
+    },
+  })
+  presentacionCantidad?: number | null;
+
+  @Column({
+    name: 'presentacion_unidad_medida',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  presentacionUnidadMedida?: UnidadMedida | null;
+
+  setPresentacion(cantidad: number, unidadMedida: UnidadMedida): void {
+    const presentacion = new Presentacion(cantidad, unidadMedida);
+    this.presentacionCantidad = presentacion.cantidad;
+    this.presentacionUnidadMedida = presentacion.unidadMedida;
+  }
+
+  getPresentacion(): Presentacion | null {
+    if (
+      this.presentacionCantidad === null ||
+      this.presentacionCantidad === undefined ||
+      this.presentacionUnidadMedida === null ||
+      this.presentacionUnidadMedida === undefined
+    ) {
+      return null;
+    }
+
+    return new Presentacion(
+      this.presentacionCantidad,
+      this.presentacionUnidadMedida,
+    );
+  }
+
+  getPresentacionDescripcion(): string | null {
+    const presentacion = this.getPresentacion();
+    return presentacion ? presentacion.getDescripcionFormateada() : null;
+  }
+
   @Column({ type: 'text', nullable: true })
   imagen?: string;
 
@@ -175,7 +236,7 @@ export class Producto {
   @Column({ type: 'text', nullable: true })
   codigoReferencia?: string | null;
 
-  // ========== CR-001: MÉTODOS DE CREACIÓN Y ACTUALIZACIÓN CON VOS ==========
+// ========== CR-001: MÉTODOS DE CREACIÓN Y ACTUALIZACIÓN CON VOS ==========
 
   static crear(datos: {
     denominacion: Denominacion;
@@ -206,6 +267,9 @@ export class Producto {
     imagen?: string;
     ubicacion?: string;
     sistema?: number;
+    denominacionManual?: boolean;
+    presentacionCantidad?: number | null;
+    presentacionUnidadMedida?: UnidadMedida | null;
   }): Producto {
     const producto = new Producto();
 
@@ -219,6 +283,8 @@ export class Producto {
     producto.precio = precioCalculado.valor;
 
     // Resto de campos del DTO
+    producto.denominacionManual =
+      datos.denominacionManual ?? false;
     producto.codigoProveedor = datos.codigoProveedor ?? null;
     producto.codigoBarra = datos.codigoBarra ?? null;
     producto.codigoReferencia = datos.codigoReferencia ?? null;
@@ -241,10 +307,18 @@ export class Producto {
     producto.imagen = datos.imagen;
     producto.ubicacion = datos.ubicacion;
     producto.sistema = datos.sistema ?? 0;
+    if (datos.presentacionCantidad !== undefined) {
+      producto.presentacionCantidad = datos.presentacionCantidad;
+    }
+    if (datos.presentacionUnidadMedida !== undefined) {
+      producto.presentacionUnidadMedida = datos.presentacionUnidadMedida;
+    }
 
     // Relaciones (ya resueltas en el service)
     producto.linea = datos.linea;
+    producto.lineaId = datos.linea?.id;
     producto.marca = datos.marca;
+    producto.marcaId = datos.marca?.id;
     producto.usuarioCreated = datos.usuarioCreated;
 
     return producto;
@@ -278,10 +352,16 @@ export class Producto {
     cantidadPorPack?: number | null;
     imagen?: string;
     ubicacion?: string;
+    denominacionManual?: boolean;
+    presentacionCantidad?: number | null;
+    presentacionUnidadMedida?: UnidadMedida | null;
   }): void {
     // Actualizar solo los campos que vengan definidos
     if (datos.denominacion !== undefined) {
       this.denominacion = datos.denominacion.valor;
+    }
+    if (datos.denominacionManual !== undefined) {
+      this.denominacionManual = datos.denominacionManual;
     }
 
     // Manejo especial de costo/porcentaje/precio
@@ -372,17 +452,33 @@ export class Producto {
     if (datos.ubicacion !== undefined) {
       this.ubicacion = datos.ubicacion;
     }
+    if (datos.presentacionCantidad !== undefined) {
+      this.presentacionCantidad = datos.presentacionCantidad;
+    }
+    if (datos.presentacionUnidadMedida !== undefined) {
+      this.presentacionUnidadMedida = datos.presentacionUnidadMedida;
+    }
 
     // Relaciones
     if (datos.linea !== undefined) {
       this.linea = datos.linea;
+      this.lineaId = datos.linea?.id;
     }
     if (datos.marca !== undefined) {
       this.marca = datos.marca;
+      this.marcaId = datos.marca?.id;
     }
     if (datos.usuarioUpdated !== undefined) {
       this.usuarioUpdated = datos.usuarioUpdated;
     }
+  }
+
+  cambiarPrecio(nuevoPrecio: number | undefined | null): void {
+    if (nuevoPrecio === undefined || nuevoPrecio === null) return;
+    if (nuevoPrecio <= 0) {
+      throw new BadRequestException('El precio resultante debe ser mayor a 0.');
+    }
+    this.precio = nuevoPrecio;
   }
 
   // ========== AJUSTE MASIVO DE PRECIOS ==========
@@ -422,7 +518,7 @@ export class Producto {
       margenActual === 0
         ? nuevoPrecio
         : nuevoPrecio / (1 + margenActual / 100);
-    this.asegurarValorPositivo(costoRecalculado, 'El precio final debe ser mayor que 0.');
+    this.asegurarValorPositivo(costoRecalculado, 'El costo recalculado debe ser mayor que 0.');
     this.precio = nuevoPrecio;
     this.costo = costoRecalculado;
   }

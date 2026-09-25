@@ -9,6 +9,7 @@ import {
   TipoAjustePrecio,
 } from '../../enums/ajuste-precio.enum';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -88,6 +89,9 @@ describe('ProductoService', () => {
   const mockUniquenessValidator: Record<string, jest.Mock> = {};
   const mockUsuarioValidator: Record<string, jest.Mock> = {};
   const mockProductoDeletePolicy: Record<string, jest.Mock> = {};
+  const mockGeneradorDenominacionService = {
+    generarDenominacion: jest.fn().mockReturnValue('denominacion generada'),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -137,6 +141,10 @@ describe('ProductoService', () => {
         {
           provide: require('../policies/producto-delete.policy').ProductoDeletePolicy,
           useValue: mockProductoDeletePolicy,
+        },
+        {
+          provide: require('../../domain/services/generador-denominacion.service.ts').GeneradorDenominacionService,
+          useValue: mockGeneradorDenominacionService,
         },
       ],
     }).compile();
@@ -361,4 +369,150 @@ describe('ProductoService', () => {
       expect(mockRepository.findActivos).not.toHaveBeenCalled();
     });
   });
+
+  // CR-004: findBy con lineaDenominacion y superLineaDenominacion
+
+  describe('findBy — CR-004', () => {
+    const mockProducto = (() => {
+      const p = new Producto();
+      p.id = 1;
+      p.denominacion = 'Leche Entera';
+      p.precio = 500;
+      p.porcentaje = 20;
+      p.costo = 400;
+      return p;
+    })();
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+
+    // Caso 1: solo lineaDenominacion
+    it('debería llamar a repository.findBy con lineaDenominacion y sin superLineaDenominacion', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '',           // denominacion
+        '',           // codigoProveedor
+        false,        // codProveedorExacto
+        '',           // codigoReferencia
+        0,            // marca_id
+        0,            // linea_id
+        0,            // proveedor_id
+        false,        // conStock
+        0,            // skip
+        10,           // take
+        'lacteos',    // lineaDenominacion
+        undefined,    // superLineaDenominacion
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        undefined,
+      );
+    });
+
+
+    // Caso 2: solo superLineaDenominacion
+    it('debería llamar a repository.findBy con superLineaDenominacion y sin lineaDenominacion', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        undefined,      // lineaDenominacion
+        'alimentos',    // superLineaDenominacion
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        undefined,
+        'alimentos',
+      );
+    });
+
+
+    // Caso 3: ambos combinados (AND)
+    it('debería llamar a repository.findBy con lineaDenominacion y superLineaDenominacion', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        'alimentos',
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        'alimentos',
+      );
+    });
+
+
+    // Caso 4: lineaDenominacion + denominacion existente (combinación con filtros anteriores)
+    it('debería combinar denominacion y lineaDenominacion sin romper el filtro existente', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        'leche',
+        '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        undefined,
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        'leche',
+        '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        undefined,
+      );
+    });
+
+
+    // Caso 5: sin resultados — debe devolver lista vacía, sin lanzar excepción
+    it('debería devolver data vacía y total 0 cuando el repositorio no encuentra resultados', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [], total: 0 });
+
+      const resultado = await service.findBy(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'inexistente',
+        undefined,
+      );
+
+      expect(resultado.data).toEqual([]);
+      expect(resultado.total).toBe(0);
+      expect(mockRepository.findBy).toHaveBeenCalledTimes(1);
+    });
+
+    // Caso 6: retrocompatibilidad — solo lineaId, sin los nuevos params de texto
+    it('debería pasar lineaId sin params de texto de CR-004 (retrocompatibilidad)', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '', '', false, '', 0, 5, 0,
+        false, 0, 10,
+        undefined,      // lineaDenominacion
+        undefined,      // superLineaDenominacion
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 5, 0,
+        false, 0, 10,
+        undefined,
+        undefined,
+      );
+    });
+  });
+
 });
+

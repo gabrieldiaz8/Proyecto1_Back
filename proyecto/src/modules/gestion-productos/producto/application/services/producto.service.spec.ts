@@ -399,7 +399,6 @@ describe('ProductoService', () => {
         '',           // codigoReferencia
         0,            // marca_id
         0,            // linea_id
-        0,            // proveedor_id
         false,        // conStock
         0,            // skip
         10,           // take
@@ -408,7 +407,7 @@ describe('ProductoService', () => {
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         undefined,
@@ -421,14 +420,14 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
 
       await service.findBy(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         undefined,      // lineaDenominacion
         'alimentos',    // superLineaDenominacion
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         undefined,
         'alimentos',
@@ -441,14 +440,14 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
 
       await service.findBy(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         'alimentos',
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         'alimentos',
@@ -462,7 +461,7 @@ describe('ProductoService', () => {
 
       await service.findBy(
         'leche',
-        '', false, '', 0, 0, 0,
+        '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         undefined,
@@ -470,7 +469,7 @@ describe('ProductoService', () => {
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
         'leche',
-        '', false, '', 0, 0, 0,
+        '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         undefined,
@@ -483,7 +482,7 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [], total: 0 });
 
       const resultado = await service.findBy(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'inexistente',
         undefined,
@@ -499,14 +498,14 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
 
       await service.findBy(
-        '', '', false, '', 0, 5, 0,
+        '', '', false, '', 0, 5,
         false, 0, 10,
         undefined,      // lineaDenominacion
         undefined,      // superLineaDenominacion
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 5, 0,
+        '', '', false, '', 0, 5,
         false, 0, 10,
         undefined,
         undefined,

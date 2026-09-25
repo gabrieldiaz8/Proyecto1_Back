@@ -8,6 +8,7 @@ import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usu
 import { Linea } from '../../linea/domain/entities/linea.entity';
 import { Marca } from '../../marca/domain/entities/marca.entity';
 import { Denominacion } from '../domain/value-objects/denominacion.vo';
+import { UnidadMedida } from '../domain/enums/unidad-medida.enum';
 import { Costo } from '../domain/value-objects/costo.vo';
 import { Porcentaje } from '../domain/value-objects/porcentaje.vo';
 import { ProductoDto } from '../dto/producto.dto';
@@ -76,6 +77,8 @@ export class ProductoMapper {
     usuario: Usuario,
     denominacionResuelta?: string,
     denominacionManual?: boolean,
+    presentacionCantidad?: number | null,
+    presentacionUnidadMedida?: UnidadMedida | null,
   ) {
     return {
       denominacion:
@@ -110,8 +113,8 @@ export class ProductoMapper {
       cantidadPorPack: dto.cantidadPorPack,
       imagen: undefined, // No está en el DTO
       ubicacion: dto.ubicacion,
-      presentacionCantidad: dto.presentacionCantidad,
-      presentacionUnidadMedida: dto.presentacionUnidadMedida,
+      presentacionCantidad,
+      presentacionUnidadMedida,
     };
   }
 

@@ -7,6 +7,7 @@ import { Linea } from '../../../linea/domain/entities/linea.entity';
 import { Marca } from '../../../marca/domain/entities/marca.entity';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
+import { UnidadMedida } from '../enums/unidad-medida.enum';
 
 describe('Producto.cambiarPrecio', () => {
   let producto: Producto;
@@ -319,6 +320,8 @@ describe('Producto.crear()', () => {
       marca: new Marca(),
       usuarioCreated: new Usuario(),
       utilizaPack: false,
+      presentacionCantidad: 5,
+      presentacionUnidadMedida: UnidadMedida.UN,
     });
   }
 
@@ -363,6 +366,8 @@ describe('Producto.actualizarDatos()', () => {
       marca: new Marca(),
       usuarioCreated: new Usuario(),
       utilizaPack: false,
+      presentacionCantidad: 5,
+      presentacionUnidadMedida: UnidadMedida.UN,
     });
   }
 

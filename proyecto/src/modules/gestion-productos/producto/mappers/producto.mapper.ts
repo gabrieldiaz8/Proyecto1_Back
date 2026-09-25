@@ -26,6 +26,8 @@ export class ProductoMapper {
     linea: Linea,
     marca: Marca,
     usuario: Usuario,
+    presentacionCantidad: number,
+    presentacionUnidadMedida: UnidadMedida,
     denominacionResuelta?: string,
     denominacionManual?: boolean,
   ): Producto {
@@ -65,8 +67,8 @@ export class ProductoMapper {
       ubicacion: dto.ubicacion,
       sistema: 0,
       denominacionManual,
-      presentacionCantidad: dto.presentacionCantidad,
-      presentacionUnidadMedida: dto.presentacionUnidadMedida,
+      presentacionCantidad,
+      presentacionUnidadMedida,
     });
   }
 

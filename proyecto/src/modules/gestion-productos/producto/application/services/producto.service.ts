@@ -459,11 +459,16 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
       );
 
     // 2 Resolver denominación (manual o automática)
-    const denominacionManual = this.denominacionEsManual(dto.denominacion)
-      ? true
-      : productoActual.denominacionManual;
+    // Se distingue entre denominación ausente (undefined → se conserva el
+    // estado actual del producto) y denominación explícitamente vaciada
+    // (→ reversión a denominación automática, CP-CR005-B-04).
+    let denominacionManual = productoActual.denominacionManual;
+    if (dto.denominacion !== undefined) {
+      denominacionManual = this.denominacionEsManual(dto.denominacion);
+    }
 
-    let denominacion = this.denominacionEsManual(dto.denominacion)
+    const manualEnDto = this.denominacionEsManual(dto.denominacion);
+    let denominacion = manualEnDto
       ? (dto.denominacion as string)
       : productoActual.denominacion;
 
@@ -478,7 +483,14 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
         (presentacionUnidadMedida ?? null) !==
           (productoActual.presentacionUnidadMedida ?? null);
 
-      if (cambianComponentes) {
+      // Al revertir de manual a automática se regenera la denominación aunque
+      // no cambien los componentes de la misma (CP-CR005-B-04).
+      const reverteAAutomatico =
+        dto.denominacion !== undefined &&
+        productoActual.denominacionManual &&
+        !denominacionManual;
+
+      if (cambianComponentes || reverteAAutomatico) {
         denominacion = this.generadorDenominacionService.generarDenominacion(
           marca.denominacion,
           linea.denominacion,

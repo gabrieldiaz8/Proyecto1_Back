@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ProductoService } from './producto.service';
 import { Producto } from '../../domain/entities/producto.entity';
+import { CreateProductoDto } from '../../dto/create-producto.dto';
 import {
   AlcanceAjustePrecio,
   ModalidadAjustePrecio,
   TipoAjustePrecio,
 } from '../../enums/ajuste-precio.enum';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,7 +65,7 @@ describe('ProductoService', () => {
     findBy: jest.fn(),
     findByRapido: jest.fn(),
     findByIdWithoutRelations: jest.fn(),
-    update: jest.fn(),
+    save: jest.fn(),
     updateEntity: jest.fn(),
     actualizarPrecio: jest.fn(),
     remove: jest.fn(),
@@ -74,20 +76,22 @@ describe('ProductoService', () => {
     existsProductosActivosByMarca: jest.fn(),
     existsProductosActivosByLinea: jest.fn(),
     findByIds: jest.fn(),
-    create: jest.fn(),
   };
 
   // Mocks vacíos para todos los demás providers inyectados
-  const mockLineaService = {};
-  const mockMarcaService = {};
-  const mockProveedorService = {};
-  const mockUsuarioService = {};
-  const mockIntrinsicValidationService = {};
-  const mockValidationService = {};
-  const mockRelatedEntitiesValidator = {};
-  const mockUniquenessValidator = {};
-  const mockUsuarioValidator = {};
-  const mockProductoDeletePolicy = {};
+  const mockLineaService: Record<string, jest.Mock> = {};
+  const mockMarcaService: Record<string, jest.Mock> = {};
+  const mockProveedorService: Record<string, jest.Mock> = {};
+  const mockUsuarioService: Record<string, jest.Mock> = {};
+  const mockIntrinsicValidationService: Record<string, jest.Mock> = {};
+  const mockValidationService: Record<string, jest.Mock> = {};
+  const mockRelatedEntitiesValidator: Record<string, jest.Mock> = {};
+  const mockUniquenessValidator: Record<string, jest.Mock> = {};
+  const mockUsuarioValidator: Record<string, jest.Mock> = {};
+  const mockProductoDeletePolicy: Record<string, jest.Mock> = {};
+  const mockGeneradorDenominacionService = {
+    generarDenominacion: jest.fn().mockReturnValue('denominacion generada'),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -138,6 +142,10 @@ describe('ProductoService', () => {
           provide: require('../policies/producto-delete.policy').ProductoDeletePolicy,
           useValue: mockProductoDeletePolicy,
         },
+        {
+          provide: require('../../domain/services/generador-denominacion.service.ts').GeneradorDenominacionService,
+          useValue: mockGeneradorDenominacionService,
+        },
       ],
     }).compile();
 
@@ -146,6 +154,113 @@ describe('ProductoService', () => {
 
   it('debería estar definido', () => {
     expect(service).toBeDefined();
+  });
+
+  // ===========================================================================
+  // CR-001: create
+  // ===========================================================================
+
+  describe('create', () => {
+    function crearCreateDto(overrides: Partial<CreateProductoDto> = {}): CreateProductoDto {
+      const dto = new CreateProductoDto();
+      dto.denominacion = 'producto test';
+      dto.lineaId = 1;
+      dto.marcaId = 1;
+      dto.alicuotaIva = require('src/modules/organizacion/enums/alicuota-iva.enum').AlicuotaIva.ALICUOTA_21;
+      dto.usuarioCreatedId = 1;
+      dto.utilizaStockMinimo = false;
+      dto.utilizaPack = false;
+      dto.costo = 100;
+      dto.porcentaje = 25;
+      dto.precio = 125;
+      return Object.assign(dto, overrides);
+    }
+
+    it('debería lanzar NotFoundException cuando lineaId no existe y no llamar a save', async () => {
+      const dto = crearCreateDto({ lineaId: 999 });
+
+      // intrinsicValidation no lanza
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      // uniqueness no lanza
+      mockUniquenessValidator.validarDenominacionUnica = jest.fn().mockResolvedValue(undefined);
+      // relatedEntities lanza NotFoundException (línea no existe)
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockRejectedValue(
+          new (require('@nestjs/common').NotFoundException)('Línea con ID 999 no encontrada'),
+        );
+
+      await expect(service.create(dto)).rejects.toThrow(
+        require('@nestjs/common').NotFoundException,
+      );
+      await expect(service.create(dto)).rejects.toThrow('Línea con ID 999 no encontrada');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar NotFoundException cuando marcaId no existe y no llamar a save', async () => {
+      const dto = crearCreateDto({ marcaId: 888 });
+
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockUniquenessValidator.validarDenominacionUnica = jest.fn().mockResolvedValue(undefined);
+      // relatedEntities lanza NotFoundException (marca no existe)
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockRejectedValue(
+          new (require('@nestjs/common').NotFoundException)('Marca con ID 888 no encontrada'),
+        );
+
+      await expect(service.create(dto)).rejects.toThrow(
+        require('@nestjs/common').NotFoundException,
+      );
+      await expect(service.create(dto)).rejects.toThrow('Marca con ID 888 no encontrada');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería llamar a repository.save cuando los datos son válidos', async () => {
+      const dto = crearCreateDto();
+
+      const mockLinea = { id: 1, denominacion: 'Línea A' };
+      const mockMarca = { id: 1, denominacion: 'Marca A' };
+      const mockUsuario = { id: 1, nombre: 'admin' };
+
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockUniquenessValidator.validarDenominacionUnica = jest.fn().mockResolvedValue(undefined);
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({ marca: mockMarca, linea: mockLinea });
+      mockValidationService.validarEntidadesRelacionadas = jest.fn();
+      mockUsuarioValidator.validarUsuarioExiste = jest.fn().mockResolvedValue(mockUsuario);
+
+      const entityGuardada = new (require('../../domain/entities/producto.entity').Producto)();
+      entityGuardada.denominacion = dto.denominacion;
+      mockRepository.save.mockResolvedValue(entityGuardada);
+
+      await service.create(dto);
+
+      expect(mockRepository.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ===========================================================================
+  // CR-001: update
+  // ===========================================================================
+
+  describe('update', () => {
+    it('debería lanzar NotFoundException cuando el producto a actualizar no existe', async () => {
+      // findOne retorna null → producto no existe
+      mockRepository.findOne.mockResolvedValue(null);
+
+      const { UpdateProductoDto } = require('../../dto/update-producto.dto');
+      const dto = new UpdateProductoDto();
+      dto.usuarioUpdatedId = 1;
+
+      await expect(service.update(999, dto)).rejects.toThrow(
+        require('@nestjs/common').NotFoundException,
+      );
+      await expect(service.update(999, dto)).rejects.toThrow(
+        'Producto con ID 999 no encontrado.',
+      );
+    });
   });
 
   // ===========================================================================
@@ -254,4 +369,150 @@ describe('ProductoService', () => {
       expect(mockRepository.findActivos).not.toHaveBeenCalled();
     });
   });
+
+  // CR-004: findBy con lineaDenominacion y superLineaDenominacion
+
+  describe('findBy — CR-004', () => {
+    const mockProducto = (() => {
+      const p = new Producto();
+      p.id = 1;
+      p.denominacion = 'Leche Entera';
+      p.precio = 500;
+      p.porcentaje = 20;
+      p.costo = 400;
+      return p;
+    })();
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+
+    // Caso 1: solo lineaDenominacion
+    it('debería llamar a repository.findBy con lineaDenominacion y sin superLineaDenominacion', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '',           // denominacion
+        '',           // codigoProveedor
+        false,        // codProveedorExacto
+        '',           // codigoReferencia
+        0,            // marca_id
+        0,            // linea_id
+        0,            // proveedor_id
+        false,        // conStock
+        0,            // skip
+        10,           // take
+        'lacteos',    // lineaDenominacion
+        undefined,    // superLineaDenominacion
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        undefined,
+      );
+    });
+
+
+    // Caso 2: solo superLineaDenominacion
+    it('debería llamar a repository.findBy con superLineaDenominacion y sin lineaDenominacion', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        undefined,      // lineaDenominacion
+        'alimentos',    // superLineaDenominacion
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        undefined,
+        'alimentos',
+      );
+    });
+
+
+    // Caso 3: ambos combinados (AND)
+    it('debería llamar a repository.findBy con lineaDenominacion y superLineaDenominacion', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        'alimentos',
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        'alimentos',
+      );
+    });
+
+
+    // Caso 4: lineaDenominacion + denominacion existente (combinación con filtros anteriores)
+    it('debería combinar denominacion y lineaDenominacion sin romper el filtro existente', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        'leche',
+        '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        undefined,
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        'leche',
+        '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'lacteos',
+        undefined,
+      );
+    });
+
+
+    // Caso 5: sin resultados — debe devolver lista vacía, sin lanzar excepción
+    it('debería devolver data vacía y total 0 cuando el repositorio no encuentra resultados', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [], total: 0 });
+
+      const resultado = await service.findBy(
+        '', '', false, '', 0, 0, 0,
+        false, 0, 10,
+        'inexistente',
+        undefined,
+      );
+
+      expect(resultado.data).toEqual([]);
+      expect(resultado.total).toBe(0);
+      expect(mockRepository.findBy).toHaveBeenCalledTimes(1);
+    });
+
+    // Caso 6: retrocompatibilidad — solo lineaId, sin los nuevos params de texto
+    it('debería pasar lineaId sin params de texto de CR-004 (retrocompatibilidad)', async () => {
+      mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
+
+      await service.findBy(
+        '', '', false, '', 0, 5, 0,
+        false, 0, 10,
+        undefined,      // lineaDenominacion
+        undefined,      // superLineaDenominacion
+      );
+
+      expect(mockRepository.findBy).toHaveBeenCalledWith(
+        '', '', false, '', 0, 5, 0,
+        false, 0, 10,
+        undefined,
+        undefined,
+      );
+    });
+  });
+
 });
+

@@ -48,6 +48,7 @@ export class LineaPersistenceAdapter
         stockMinimo: data.stockMinimo,
         usuarioCreatedId: data.usuarioCreatedId,
         observacion: data.observacion,
+        superLineaId: data.superLineaId,
       });
 
       const entityGuardada = await repo.save(nuevaEntity);
@@ -82,6 +83,7 @@ export class LineaPersistenceAdapter
     entity.utilizaStockMinimo = data.utilizaStockMinimo;
     entity.stockMinimo = data.stockMinimo ?? 0;
     entity.usuarioCreatedId = data.usuarioCreatedId;
+    entity.superLineaId = data.superLineaId ?? entity.superLineaId;
 
     // Guardar entidad antes de procesar sublíneas (opcional según lógica de negocio)
     const entityActualizada = await repo.save(entity);
@@ -168,7 +170,7 @@ export class LineaPersistenceAdapter
       }
 
       this.logger.log(
-        `✅ Encontrada línea (puede estar activa o eliminada): ID=${entity.id}, denominación=${entity.denominacion}`,
+        `Encontrada línea (puede estar activa o eliminada): ID=${entity.id}, denominación=${entity.denominacion}`,
       );
       return entity;
     } catch (error) {

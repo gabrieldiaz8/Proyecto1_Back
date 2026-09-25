@@ -18,8 +18,11 @@ import { ProductoUniquenessValidator } from './infraestructure/validators/produc
 import { ProductoRelatedEntitiesValidator } from './infraestructure/validators/producto-related-entities.validator.ts';
 import { ProductoValidationService } from './domain/services/producto-validation.service.ts';
 import { ProductoIntrinsicValidationService } from './domain/services/producto-intrinsic-validation.service.ts';
+import { GeneradorDenominacionService } from './domain/services/generador-denominacion.service.ts';
 import { ProductoDeletePolicy } from './application/policies/producto-delete.policy';
 
+
+import { HistorialPrecioModule } from '../historial-precio/historial-precio.module';
 
 @Module({
   imports: [
@@ -29,6 +32,7 @@ import { ProductoDeletePolicy } from './application/policies/producto-delete.pol
     forwardRef(() => MarcaModule),
     ProveedorModule,
     UsuarioModule,
+    HistorialPrecioModule,
   ],
 
   controllers: [ProductoController],
@@ -37,6 +41,7 @@ import { ProductoDeletePolicy } from './application/policies/producto-delete.pol
     ProductoService,
     ProductoIntrinsicValidationService,
     ProductoValidationService,
+    GeneradorDenominacionService,
     ProductoRelatedEntitiesValidator,
     ProductoUniquenessValidator,
     ProductoDeletePolicy,

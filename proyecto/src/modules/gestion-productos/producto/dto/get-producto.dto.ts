@@ -2,12 +2,16 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
+  IsPositive,
   IsString,
   Min,
 } from 'class-validator';
+import { UnidadMedida } from '../domain/enums/unidad-medida.enum';
 /*
 Se Utiliza para la busqueda y llenado de la tabla
 */
@@ -24,6 +28,14 @@ export class GetProductoDto {
   })
   @IsString()
   denominacion: string;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'Indica si la denominación fue asignada manualmente (true) o generada automáticamente (false).',
+  })
+  @IsBoolean()
+  denominacionManual: boolean;
 
   @ApiProperty({
     example: '1158 Caja de tornillos',
@@ -127,6 +139,26 @@ export class GetProductoDto {
   @IsInt()
   @Min(0)
   cantidadPorPack: number;
+
+  @ApiProperty({
+    example: 750,
+    description: 'Cantidad de la presentación del producto.',
+  })
+  @Type(() => Number)
+  @IsNumber()
+  @IsPositive()
+  @IsOptional()
+  presentacionCantidad?: number;
+
+  @ApiProperty({
+    example: 'ML',
+    description: 'Unidad de medida de la presentación del producto.',
+    enum: UnidadMedida,
+    enumName: 'UnidadMedida',
+  })
+  @IsEnum(UnidadMedida)
+  @IsOptional()
+  presentacionUnidadMedida?: UnidadMedida;
 
   @IsString()
   codigoReferencia: string;

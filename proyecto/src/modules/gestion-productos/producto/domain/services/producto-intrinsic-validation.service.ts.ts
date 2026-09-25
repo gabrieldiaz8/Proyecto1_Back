@@ -1,5 +1,7 @@
 // domain/services/producto-intrinsic-validation.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { UnidadMedida } from '../enums/unidad-medida.enum';
+import { Presentacion } from '../value-objects/presentacion.vo';
 
 @Injectable()
 export class ProductoIntrinsicValidationService {
@@ -11,21 +13,47 @@ export class ProductoIntrinsicValidationService {
     marcaId: number;
     lineaId: number;
     alicuotaIva?: number;
-    precioMayorista?: number;
-    precioCliente?: number;
-    precioOcasional?: number;
+    presentacionCantidad?: number | null;
+    presentacionUnidadMedida?: UnidadMedida | null;
   }): void {
     this.validarDenominacion(datos.denominacion);
     this.validarIds(datos.marcaId, datos.lineaId);
-    this.validarPrecios(
-      datos.precioMayorista,
-      datos.precioCliente,
-      datos.precioOcasional,
-    );
-    
+
     if (datos.alicuotaIva !== undefined) {
       this.validarAlicuotaIva(datos.alicuotaIva);
     }
+
+    if (
+      datos.presentacionCantidad !== undefined ||
+      datos.presentacionUnidadMedida !== undefined
+    ) {
+      this.validarPresentacion(
+        datos.presentacionCantidad,
+        datos.presentacionUnidadMedida,
+      );
+    }
+  }
+
+  private validarPresentacion(
+    cantidad?: number | null,
+    unidadMedida?: UnidadMedida | null,
+  ): void {
+    const envioIncompleto =
+      (cantidad === undefined || cantidad === null) !==
+        (unidadMedida === undefined || unidadMedida === null) ||
+      (cantidad === null) !== (unidadMedida === null);
+
+    if (envioIncompleto) {
+      throw new BadRequestException(
+        'La cantidad y unidad de medida de la presentación deben enviarse juntas',
+      );
+    }
+
+    if (cantidad === null || unidadMedida === null) {
+      return; // borrado explícito de la presentación
+    }
+
+    new Presentacion(cantidad as number, unidadMedida as UnidadMedida);
   }
 
   private validarDenominacion(denominacion: string): void {
@@ -50,54 +78,6 @@ export class ProductoIntrinsicValidationService {
       throw new BadRequestException('Línea ID es requerido y debe ser válido');
     }
 
-  }
-
-  /**
-   * Valida la jerarquía de precios: Mayorista <= Cliente <= Ocasional
-   */
-  private validarPrecios(
-    precioMayorista?: number,
-    precioCliente?: number,
-    precioOcasional?: number,
-  ): void {
-    if (precioMayorista !== undefined && precioMayorista < 0) {
-      throw new BadRequestException(
-        'El precio mayorista no puede ser negativo',
-      );
-    }
-    if (precioCliente !== undefined && precioCliente < 0) {
-      throw new BadRequestException('El precio cliente no puede ser negativo');
-    }
-    if (precioOcasional !== undefined && precioOcasional < 0) {
-      throw new BadRequestException(
-        'El precio ocasional no puede ser negativo',
-      );
-    }
-
-    // Validar jerarquía: Mayorista <= Cliente <= Ocasional
-    if (precioMayorista && precioCliente) {
-      if (precioMayorista > precioCliente) {
-        throw new BadRequestException(
-          'El precio Mayorista no puede superar el precio Cliente',
-        );
-      }
-    }
-
-    if (precioCliente && precioOcasional) {
-      if (precioCliente > precioOcasional) {
-        throw new BadRequestException(
-          'El precio Cliente no puede superar el precio Ocasional',
-        );
-      }
-    }
-
-    if (precioMayorista && precioOcasional) {
-      if (precioMayorista > precioOcasional) {
-        throw new BadRequestException(
-          'El precio Mayorista no puede superar el precio Ocasional',
-        );
-      }
-    }
   }
 
   private validarAlicuotaIva(alicuotaIva: number): void {

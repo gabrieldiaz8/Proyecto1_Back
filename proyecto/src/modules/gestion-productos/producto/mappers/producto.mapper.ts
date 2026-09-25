@@ -2,7 +2,14 @@ import { Logger } from '@nestjs/common';
 import { Producto } from '../domain/entities/producto.entity';
 import { GetProductoDto } from '../dto/get-producto.dto';
 import { UpdatePrecioDto } from '../dto/update-precio.dto';
+import { UpdateProductoDto } from '../dto/update-producto.dto';
+import { CreateProductoDto } from '../dto/create-producto.dto';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
+import { Linea } from '../../linea/domain/entities/linea.entity';
+import { Marca } from '../../marca/domain/entities/marca.entity';
+import { Denominacion } from '../domain/value-objects/denominacion.vo';
+import { Costo } from '../domain/value-objects/costo.vo';
+import { Porcentaje } from '../domain/value-objects/porcentaje.vo';
 import { ProductoDto } from '../dto/producto.dto';
 
 import {
@@ -13,6 +20,101 @@ export class ProductoMapper {
  
   private static readonly logger = new Logger(ProductoMapper.name);
 
+  static toNewEntity(
+    dto: CreateProductoDto,
+    linea: Linea,
+    marca: Marca,
+    usuario: Usuario,
+    denominacionResuelta?: string,
+    denominacionManual?: boolean,
+  ): Producto {
+    const denominacion = new Denominacion(
+      denominacionResuelta ?? dto.denominacion,
+    );
+    const costo = new Costo(dto.costo ?? 0);
+    const porcentaje = new Porcentaje(dto.porcentaje ?? 0);
+
+    return Producto.crear({
+      denominacion,
+      costo,
+      porcentaje,
+      codigoProveedor: dto.codigoProveedor,
+      codigoBarra: dto.codigoBarra,
+      codigoReferencia: dto.codigoReferencia,
+      alicuotaIva: dto.alicuotaIva,
+      stock: dto.stock,
+      utilizaStockMinimo: dto.utilizaStockMinimo,
+      utilizaStockMinimoPorEmpresa: false, // No está en el DTO, valor por defecto
+      stockMinimo: dto.stockMinimo,
+      costoDolar: dto.costoDolar,
+      cotizacionDolar: undefined, // No está en el DTO
+      precioDolar: undefined, // No está en el DTO
+      fechaCosto: dto.createdAt,
+      costoEnDolar: dto.costoEnDolar,
+      fechaCostoDolar: undefined, // No está en el DTO
+      destacado: dto.destacado,
+      envioGratis: dto.envioGratis,
+      observacion: dto.observacion,
+      linea,
+      marca,
+      usuarioCreated: usuario,
+      utilizaPack: dto.utilizaPack,
+      cantidadPorPack: dto.cantidadPorPack,
+      imagen: undefined, // No está en el DTO
+      ubicacion: dto.ubicacion,
+      sistema: 0,
+      denominacionManual,
+      presentacionCantidad: dto.presentacionCantidad,
+      presentacionUnidadMedida: dto.presentacionUnidadMedida,
+    });
+  }
+
+  static toCambiosActualizacion(
+    dto: UpdateProductoDto,
+    linea: Linea,
+    marca: Marca,
+    usuario: Usuario,
+    denominacionResuelta?: string,
+    denominacionManual?: boolean,
+  ) {
+    return {
+      denominacion:
+        (denominacionResuelta ?? dto.denominacion) !== undefined
+          ? new Denominacion(denominacionResuelta ?? dto.denominacion)
+          : undefined,
+      denominacionManual,
+      costo: dto.costo !== undefined ? new Costo(dto.costo) : undefined,
+      porcentaje:
+        dto.porcentaje !== undefined ? new Porcentaje(dto.porcentaje) : undefined,
+      codigoProveedor: dto.codigoProveedor,
+      codigoBarra: dto.codigoBarra,
+      codigoReferencia: dto.codigoReferencia,
+      alicuotaIva: dto.alicuotaIva,
+      stock: dto.stock,
+      utilizaStockMinimo: dto.utilizaStockMinimo,
+      utilizaStockMinimoPorEmpresa: undefined, // No está en el DTO
+      stockMinimo: dto.stockMinimo,
+      costoDolar: dto.costoDolar,
+      cotizacionDolar: undefined, // No está en el DTO
+      precioDolar: undefined, // No está en el DTO
+      fechaCosto: undefined, // No está en el DTO
+      costoEnDolar: dto.costoEnDolar,
+      fechaCostoDolar: undefined, // No está en el DTO
+      destacado: dto.destacado,
+      envioGratis: dto.envioGratis,
+      observacion: dto.observacion,
+      linea: dto.lineaId !== undefined ? linea : undefined,
+      marca: dto.marcaId !== undefined ? marca : undefined,
+      usuarioUpdated: usuario,
+      utilizaPack: dto.utilizaPack,
+      cantidadPorPack: dto.cantidadPorPack,
+      imagen: undefined, // No está en el DTO
+      ubicacion: dto.ubicacion,
+      presentacionCantidad: dto.presentacionCantidad,
+      presentacionUnidadMedida: dto.presentacionUnidadMedida,
+    };
+  }
+
   static toBusquedaDto(entity: Producto): GetProductoDto {
     const precio = entity.precio ?? 0;
     const alicuota = entity.alicuotaIva ?? 0;
@@ -20,6 +122,7 @@ export class ProductoMapper {
     return {
       id: entity.id,
       denominacion: entity.denominacion,
+      denominacionManual: entity.denominacionManual,
       observacion: entity.observacion ?? '',
       codigoProveedorDenominacion:
         entity.codigoProveedor + ' - ' + entity.denominacion,
@@ -41,6 +144,10 @@ export class ProductoMapper {
       stockMinimo: entity.stockMinimo,
       utilizaPack: entity.utilizaPack,
       cantidadPorPack: entity.cantidadPorPack ?? 0,
+      presentacionCantidad: entity.presentacionCantidad ?? undefined,
+      presentacionUnidadMedida:
+        (entity.presentacionUnidadMedida as GetProductoDto['presentacionUnidadMedida']) ??
+        undefined,
       sistema: entity.sistema,
       codigoReferencia: entity.codigoReferencia ?? '',
 
@@ -72,6 +179,7 @@ export class ProductoMapper {
     return {
       id: entity.id,
       denominacion: entity.denominacion,
+      denominacionManual: entity.denominacionManual,
       observacion: entity.observacion ?? '',
       codigoProveedor: entity.codigoProveedor ?? '',
       codigoBarra: entity.codigoBarra ?? '',
@@ -95,6 +203,10 @@ export class ProductoMapper {
       stockMinimo: entity.stockMinimo ?? 0,
       utilizaPack: entity.utilizaPack ?? false,
       cantidadPorPack: entity.cantidadPorPack ?? 0,
+      presentacionCantidad: entity.presentacionCantidad ?? undefined,
+      presentacionUnidadMedida:
+        (entity.presentacionUnidadMedida as ProductoDto['presentacionUnidadMedida']) ??
+        undefined,
       sistema: entity.sistema,
       codigoReferencia: entity.codigoReferencia ?? '',
 

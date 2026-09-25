@@ -119,19 +119,19 @@ describe('ProductoService', () => {
           useValue: mockUsuarioService,
         },
         {
-          provide: require('../../domain/services/producto-intrinsic-validation.service.ts').ProductoIntrinsicValidationService,
+          provide: require('../../domain/services/producto-intrinsic-validation.service').ProductoIntrinsicValidationService,
           useValue: mockIntrinsicValidationService,
         },
         {
-          provide: require('../../domain/services/producto-validation.service.ts').ProductoValidationService,
+          provide: require('../../domain/services/producto-validation.service').ProductoValidationService,
           useValue: mockValidationService,
         },
         {
-          provide: require('../../infraestructure/validators/producto-related-entities.validator.ts').ProductoRelatedEntitiesValidator,
+          provide: require('../../infraestructure/validators/producto-related-entities.validator').ProductoRelatedEntitiesValidator,
           useValue: mockRelatedEntitiesValidator,
         },
         {
-          provide: require('../../infraestructure/validators/producto-uniqueness.validator.ts').ProductoUniquenessValidator,
+          provide: require('../../infraestructure/validators/producto-uniqueness.validator').ProductoUniquenessValidator,
           useValue: mockUniquenessValidator,
         },
         {

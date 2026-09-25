@@ -75,8 +75,14 @@ export class ProductoService {
     );
 
     // Orquestar todas las validaciones
-    const { data, marca, linea, usuario } =
-      await this.validarYPrepararCreacion(dto);
+    const {
+      data,
+      marca,
+      linea,
+      usuario,
+      presentacionCantidad,
+      presentacionUnidadMedida,
+    } = await this.validarYPrepararCreacion(dto);
 
     // Construir la entidad a partir del DTO (usa la denominación resuelta)
     const entity = ProductoMapper.toNewEntity(
@@ -84,6 +90,8 @@ export class ProductoService {
       linea,
       marca,
       usuario,
+      presentacionCantidad,
+      presentacionUnidadMedida,
       data.denominacion,
       data.denominacionManual,
     );
@@ -346,6 +354,18 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
    * @private
    */
   private async validarYPrepararCreacion(dto: CreateProductoDto) {
+    const presentacionCantidad = dto.presentacionCantidad;
+    const presentacionUnidadMedida = dto.presentacionUnidadMedida;
+
+    if (
+      presentacionCantidad == null ||
+      presentacionUnidadMedida == null
+    ) {
+      throw new BadRequestException(
+        'La presentación es obligatoria: debe enviar presentacionCantidad y presentacionUnidadMedida',
+      );
+    }
+
     // 1 Validar entidades relacionadas existen y obtener nombres (Infrastructure - DB)
     const { marca, linea } =
       await this.relatedEntitiesValidator.validarYObtenerEntidadesRelacionadas(
@@ -399,7 +419,14 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
 
     const data = { ...dto, denominacion, denominacionManual };
 
-    return { data, marca, linea, usuario };
+    return {
+      data,
+      marca,
+      linea,
+      usuario,
+      presentacionCantidad,
+      presentacionUnidadMedida,
+    };
   }
   /**
    * Orquesta todas las validaciones necesarias para actualizar un producto

@@ -173,6 +173,8 @@ describe('ProductoService', () => {
       dto.costo = 100;
       dto.porcentaje = 25;
       dto.precio = 125;
+      dto.presentacionCantidad = 500;
+      dto.presentacionUnidadMedida = require('../../domain/enums/unidad-medida.enum').UnidadMedida.ML;
       return Object.assign(dto, overrides);
     }
 
@@ -213,6 +215,18 @@ describe('ProductoService', () => {
         require('@nestjs/common').NotFoundException,
       );
       await expect(service.create(dto)).rejects.toThrow('Marca con ID 888 no encontrada');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar BadRequestException cuando no se envía la presentación y no llamar a save', async () => {
+      const dto = crearCreateDto({
+        presentacionCantidad: undefined,
+        presentacionUnidadMedida: undefined,
+      });
+
+      await expect(service.create(dto)).rejects.toThrow(
+        require('@nestjs/common').BadRequestException,
+      );
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 

@@ -52,11 +52,6 @@ export class SearchProductoPaginationWithDto {
   lineaId: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  proveedorId: number; 
-
-  @IsOptional()
   @Transform(({ value }) => {
     if (value === 'true') return true;
     if (value === 'false') return false;

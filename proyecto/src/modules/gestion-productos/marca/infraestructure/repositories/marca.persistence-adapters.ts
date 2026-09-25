@@ -1,3 +1,4 @@
+import { TipoRegistro } from 'src/modules/common/enums/tipo-registro.enum';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource, IsNull, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -73,7 +74,7 @@ export class MarcaPersistenceAdapter
         .createQueryBuilder('marca')
 
         .where('marca.deletedAt IS NULL')
-        .andWhere('marca.sistema = :sistema', { sistema: 0 });
+        .andWhere('marca.sistema = :sistema', { sistema: TipoRegistro.USUARIO });
 
       query.andWhere('UPPER(marca.denominacion) LIKE :denominacion', {
         denominacion: `%${denominacion.toUpperCase()}%`,
@@ -93,7 +94,7 @@ export class MarcaPersistenceAdapter
         .createQueryBuilder('marca')
 
         .where('marca.deletedAt IS NULL')
-        .andWhere('marca.sistema = :sistema', { sistema: 1 });
+        .andWhere('marca.sistema = :sistema', { sistema: TipoRegistro.SISTEMA });
 
       query.andWhere('UPPER(marca.denominacion) LIKE :denominacion', {
         denominacion: `%${denominacion.toUpperCase()}%`,
@@ -284,3 +285,4 @@ export class MarcaPersistenceAdapter
     }
   }
 }
+

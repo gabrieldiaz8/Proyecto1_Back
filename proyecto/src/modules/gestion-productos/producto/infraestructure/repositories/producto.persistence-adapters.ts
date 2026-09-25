@@ -223,7 +223,6 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     codigoReferencia: string,
     marca_id: number,
     linea_id: number,
-    proveedor_id: number,
     conStock: boolean,
     skip: number,
     take: number,

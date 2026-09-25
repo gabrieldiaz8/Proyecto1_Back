@@ -198,6 +198,11 @@ export class Producto {
     this.presentacionUnidadMedida = presentacion.unidadMedida;
   }
 
+  limpiarPresentacion(): void {
+    this.presentacionCantidad = null;
+    this.presentacionUnidadMedida = null;
+  }
+
   getPresentacion(): Presentacion | null {
     if (
       this.presentacionCantidad === null ||
@@ -268,8 +273,8 @@ export class Producto {
     ubicacion?: string;
     sistema?: number;
     denominacionManual?: boolean;
-    presentacionCantidad?: number | null;
-    presentacionUnidadMedida?: UnidadMedida | null;
+    presentacionCantidad: number;
+    presentacionUnidadMedida: UnidadMedida;
   }): Producto {
     const producto = new Producto();
 
@@ -307,12 +312,10 @@ export class Producto {
     producto.imagen = datos.imagen;
     producto.ubicacion = datos.ubicacion;
     producto.sistema = datos.sistema ?? 0;
-    if (datos.presentacionCantidad !== undefined) {
-      producto.presentacionCantidad = datos.presentacionCantidad;
-    }
-    if (datos.presentacionUnidadMedida !== undefined) {
-      producto.presentacionUnidadMedida = datos.presentacionUnidadMedida;
-    }
+    producto.setPresentacion(
+      datos.presentacionCantidad,
+      datos.presentacionUnidadMedida,
+    );
 
     // Relaciones (ya resueltas en el service)
     producto.linea = datos.linea;
@@ -452,11 +455,27 @@ export class Producto {
     if (datos.ubicacion !== undefined) {
       this.ubicacion = datos.ubicacion;
     }
-    if (datos.presentacionCantidad !== undefined) {
-      this.presentacionCantidad = datos.presentacionCantidad;
-    }
-    if (datos.presentacionUnidadMedida !== undefined) {
-      this.presentacionUnidadMedida = datos.presentacionUnidadMedida;
+    if (
+      datos.presentacionCantidad !== undefined ||
+      datos.presentacionUnidadMedida !== undefined
+    ) {
+      const cantidad = datos.presentacionCantidad;
+      const unidadMedida = datos.presentacionUnidadMedida;
+
+      if (cantidad === null && unidadMedida === null) {
+        this.limpiarPresentacion();
+      } else if (
+        cantidad === null ||
+        cantidad === undefined ||
+        unidadMedida === null ||
+        unidadMedida === undefined
+      ) {
+        throw new BadRequestException(
+          'La cantidad y la unidad de medida de la presentación deben enviarse juntas',
+        );
+      } else {
+        this.setPresentacion(cantidad, unidadMedida);
+      }
     }
 
     // Relaciones

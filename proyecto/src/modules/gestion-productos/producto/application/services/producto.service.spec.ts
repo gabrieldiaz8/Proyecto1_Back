@@ -119,19 +119,19 @@ describe('ProductoService', () => {
           useValue: mockUsuarioService,
         },
         {
-          provide: require('../../domain/services/producto-intrinsic-validation.service.ts').ProductoIntrinsicValidationService,
+          provide: require('../../domain/services/producto-intrinsic-validation.service').ProductoIntrinsicValidationService,
           useValue: mockIntrinsicValidationService,
         },
         {
-          provide: require('../../domain/services/producto-validation.service.ts').ProductoValidationService,
+          provide: require('../../domain/services/producto-validation.service').ProductoValidationService,
           useValue: mockValidationService,
         },
         {
-          provide: require('../../infraestructure/validators/producto-related-entities.validator.ts').ProductoRelatedEntitiesValidator,
+          provide: require('../../infraestructure/validators/producto-related-entities.validator').ProductoRelatedEntitiesValidator,
           useValue: mockRelatedEntitiesValidator,
         },
         {
-          provide: require('../../infraestructure/validators/producto-uniqueness.validator.ts').ProductoUniquenessValidator,
+          provide: require('../../infraestructure/validators/producto-uniqueness.validator').ProductoUniquenessValidator,
           useValue: mockUniquenessValidator,
         },
         {
@@ -173,6 +173,8 @@ describe('ProductoService', () => {
       dto.costo = 100;
       dto.porcentaje = 25;
       dto.precio = 125;
+      dto.presentacionCantidad = 500;
+      dto.presentacionUnidadMedida = require('../../domain/enums/unidad-medida.enum').UnidadMedida.ML;
       return Object.assign(dto, overrides);
     }
 
@@ -213,6 +215,18 @@ describe('ProductoService', () => {
         require('@nestjs/common').NotFoundException,
       );
       await expect(service.create(dto)).rejects.toThrow('Marca con ID 888 no encontrada');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar BadRequestException cuando no se envía la presentación y no llamar a save', async () => {
+      const dto = crearCreateDto({
+        presentacionCantidad: undefined,
+        presentacionUnidadMedida: undefined,
+      });
+
+      await expect(service.create(dto)).rejects.toThrow(
+        require('@nestjs/common').BadRequestException,
+      );
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
 

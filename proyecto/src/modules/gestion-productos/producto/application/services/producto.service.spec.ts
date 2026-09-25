@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ProductoService } from './producto.service';
 import { Producto } from '../../domain/entities/producto.entity';
 import { CreateProductoDto } from '../../dto/create-producto.dto';
@@ -9,7 +13,7 @@ import {
   TipoAjustePrecio,
 } from '../../enums/ajuste-precio.enum';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
-import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -143,7 +147,7 @@ describe('ProductoService', () => {
           useValue: mockProductoDeletePolicy,
         },
         {
-          provide: require('../../domain/services/generador-denominacion.service.ts').GeneradorDenominacionService,
+          provide: require('../../domain/services/generador-denominacion.service').GeneradorDenominacionService,
           useValue: mockGeneradorDenominacionService,
         },
       ],
@@ -253,6 +257,153 @@ describe('ProductoService', () => {
 
       expect(mockRepository.save).toHaveBeenCalledTimes(1);
     });
+
+    // =========================================================================
+    // CR-005 B-02 / bordes: denominación automática en create
+    // =========================================================================
+
+    it('debería generar la denominación automática cuando el DTO no trae denominación', async () => {
+      const dto = crearCreateDto({ denominacion: undefined });
+
+      const mockLinea = { id: 1, denominacion: 'Mermeladas' };
+      const mockMarca = { id: 1, denominacion: 'Arcor' };
+      const mockUsuario = { id: 1, nombre: 'admin' };
+
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'ARCOR MERMELADAS',
+      );
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockUniquenessValidator.validarDenominacionUnica = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({ marca: mockMarca, linea: mockLinea });
+      mockValidationService.validarEntidadesRelacionadas = jest.fn();
+      mockUsuarioValidator.validarUsuarioExiste = jest
+        .fn()
+        .mockResolvedValue(mockUsuario);
+
+      const entityGuardada = new (require('../../domain/entities/producto.entity').Producto)();
+      entityGuardada.denominacion = 'ARCOR MERMELADAS';
+      mockRepository.save.mockResolvedValue(entityGuardada);
+
+      await service.create(dto);
+
+      expect(mockGeneradorDenominacionService.generarDenominacion).toHaveBeenCalledWith(
+        'Arcor',
+        'Mermeladas',
+        undefined,
+      );
+      expect(mockRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('debería usar la denominación manual del DTO y no generar la automática', async () => {
+      const dto = crearCreateDto({ denominacion: 'MI ETIQUETA' });
+
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockUniquenessValidator.validarDenominacionUnica = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: 1, denominacion: 'Arcor' },
+          linea: { id: 1, denominacion: 'Mermeladas' },
+        });
+      mockValidationService.validarEntidadesRelacionadas = jest.fn();
+      mockUsuarioValidator.validarUsuarioExiste = jest
+        .fn()
+        .mockResolvedValue({ id: 1, nombre: 'admin' });
+
+      const entityGuardada = new (require('../../domain/entities/producto.entity').Producto)();
+      entityGuardada.denominacion = 'MI ETIQUETA';
+      mockRepository.save.mockResolvedValue(entityGuardada);
+
+      await service.create(dto);
+
+      expect(mockGeneradorDenominacionService.generarDenominacion).not.toHaveBeenCalled();
+      expect(mockRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('debería lanzar ConflictException cuando la denominación automática generada ya está en uso', async () => {
+      const dto = crearCreateDto({ denominacion: undefined });
+
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'ARCOR MERMELADAS',
+      );
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: 1, denominacion: 'Arcor' },
+          linea: { id: 1, denominacion: 'Mermeladas' },
+        });
+      mockUniquenessValidator.validarDenominacionUnica = jest
+        .fn()
+        .mockRejectedValue(
+          new ConflictException(
+            'La denominación "ARCOR MERMELADAS" ya está en uso',
+          ),
+        );
+
+      await expect(service.create(dto)).rejects.toThrow(ConflictException);
+      await expect(service.create(dto)).rejects.toThrow(
+        'La denominación "ARCOR MERMELADAS" ya está en uso',
+      );
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar ConflictException cuando la denominación manual ya está en uso', async () => {
+      const dto = crearCreateDto({ denominacion: 'MI ETIQUETA' });
+
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: 1, denominacion: 'Arcor' },
+          linea: { id: 1, denominacion: 'Mermeladas' },
+        });
+      mockUniquenessValidator.validarDenominacionUnica = jest
+        .fn()
+        .mockRejectedValue(
+          new ConflictException('La denominación "MI ETIQUETA" ya está en uso'),
+        );
+
+      await expect(service.create(dto)).rejects.toThrow(ConflictException);
+      expect(mockGeneradorDenominacionService.generarDenominacion).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar BadRequestException cuando faltan datos obligatorios para generar la denominación automática', async () => {
+      const dto = crearCreateDto({ denominacion: undefined });
+
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue('');
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: 1, denominacion: '' },
+          linea: { id: 1, denominacion: '' },
+        });
+
+      const { ProductoIntrinsicValidationService } = require(
+        '../../domain/services/producto-intrinsic-validation.service.ts',
+      );
+      const realIntrinsic = new ProductoIntrinsicValidationService();
+      mockIntrinsicValidationService.validarDatosBasicos =
+        realIntrinsic.validarDatosBasicos.bind(realIntrinsic);
+
+      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(dto)).rejects.toThrow(
+        'La denominación es obligatoria',
+      );
+      expect(mockGeneradorDenominacionService.generarDenominacion).toHaveBeenCalledWith(
+        '',
+        '',
+        undefined,
+      );
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
   });
 
   // ===========================================================================
@@ -274,6 +425,230 @@ describe('ProductoService', () => {
       await expect(service.update(999, dto)).rejects.toThrow(
         'Producto con ID 999 no encontrado.',
       );
+    });
+
+    // =========================================================================
+    // CR-005: denominación automática/manual en update
+    // =========================================================================
+
+    function prepararUpdate(
+      productoActual: Producto,
+      overrides: Partial<any> = {},
+    ) {
+      const dto = new (require('../../dto/update-producto.dto').UpdateProductoDto)();
+      dto.usuarioUpdatedId = 1;
+      Object.assign(dto, overrides);
+
+      mockRepository.findOne.mockResolvedValue(productoActual);
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: productoActual.marcaId, denominacion: 'Marca B' },
+          linea: { id: productoActual.lineaId, denominacion: 'Línea B' },
+        });
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockUniquenessValidator.validarDenominacionUnica = jest
+        .fn()
+        .mockResolvedValue(undefined);
+      mockValidationService.validarEntidadesRelacionadas = jest.fn();
+      mockUsuarioValidator.validarUsuarioExiste = jest
+        .fn()
+        .mockResolvedValue({ id: 1, nombre: 'admin' });
+      mockRepository.save.mockResolvedValue(productoActual);
+
+      return dto;
+    }
+
+    it('debería prevalecer la denominación manual enviada en el DTO sin regenerar (B-02)', async () => {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'ETIQUETA ANTERIOR';
+      productoActual.denominacionManual = false;
+      productoActual.marcaId = 1;
+      productoActual.lineaId = 1;
+
+      const dto = prepararUpdate(productoActual, {
+        denominacion: 'mi etiqueta',
+      });
+
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'DENOMINACION GENERADA',
+      );
+
+      await service.update(7, dto);
+
+      expect(mockGeneradorDenominacionService.generarDenominacion).not.toHaveBeenCalled();
+      expect(productoActual.denominacion).toBe('mi etiqueta');
+      expect(productoActual.denominacionManual).toBe(true);
+    });
+
+    it('debería recalcular la denominación automática cuando cambian marca o línea (B-03)', async () => {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'MARCA A LINEA A';
+      productoActual.denominacionManual = false;
+      productoActual.marcaId = 1;
+      productoActual.lineaId = 1;
+
+      const dto = prepararUpdate(productoActual, {
+        marcaId: 9,
+        lineaId: 5,
+      });
+
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: 9, denominacion: 'Marca Nueva' },
+          linea: { id: 5, denominacion: 'Línea Nueva' },
+        });
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'MARCA NUEVA LINEA NUEVA',
+      );
+
+      await service.update(7, dto);
+
+      expect(
+        mockGeneradorDenominacionService.generarDenominacion,
+      ).toHaveBeenCalledWith('Marca Nueva', 'Línea Nueva', undefined);
+      expect(productoActual.denominacion).toBe('MARCA NUEVA LINEA NUEVA');
+      expect(productoActual.denominacionManual).toBe(false);
+    });
+
+    it('debería conservar la denominación automática si no cambian los componentes (B-03)', async () => {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'MARCA A LINEA A';
+      productoActual.denominacionManual = false;
+      productoActual.marcaId = 1;
+      productoActual.lineaId = 1;
+
+      const dto = prepararUpdate(productoActual, {
+        observacion: 'solo observación',
+      });
+
+      await service.update(7, dto);
+
+      expect(mockGeneradorDenominacionService.generarDenominacion).not.toHaveBeenCalled();
+      expect(productoActual.denominacion).toBe('MARCA A LINEA A');
+      expect(productoActual.denominacionManual).toBe(false);
+    });
+
+    it('debería revertir a denominación automática al vaciar la denominación manual (B-04)', async () => {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'ETIQUETA MANUAL';
+      productoActual.denominacionManual = true;
+      productoActual.marcaId = 1;
+      productoActual.lineaId = 1;
+
+      const dto = prepararUpdate(productoActual, { denominacion: '' });
+
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'MARCA B LINEA B',
+      );
+
+      await service.update(7, dto);
+
+      expect(mockGeneradorDenominacionService.generarDenominacion).toHaveBeenCalledWith(
+        'Marca B',
+        'Línea B',
+        undefined,
+      );
+      expect(productoActual.denominacion).toBe('MARCA B LINEA B');
+      expect(productoActual.denominacionManual).toBe(false);
+    });
+
+    it('debería revertir a denominación automática aunque la denominación se envíe sólo con espacios (B-04)', async () => {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'ETIQUETA MANUAL';
+      productoActual.denominacionManual = true;
+      productoActual.marcaId = 1;
+      productoActual.lineaId = 1;
+
+      const dto = prepararUpdate(productoActual, { denominacion: '   ' });
+
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'MARCA B LINEA B',
+      );
+
+      await service.update(7, dto);
+
+      expect(mockGeneradorDenominacionService.generarDenominacion).toHaveBeenCalled();
+      expect(productoActual.denominacion).toBe('MARCA B LINEA B');
+      expect(productoActual.denominacionManual).toBe(false);
+    });
+
+    it('debería lanzar ConflictException cuando la denominación recalculada ya está en uso', async () => {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'MARCA A LINEA A';
+      productoActual.denominacionManual = false;
+      productoActual.marcaId = 1;
+      productoActual.lineaId = 1;
+
+      const dto = prepararUpdate(productoActual, {
+        marcaId: 9,
+        lineaId: 5,
+      });
+
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: 9, denominacion: 'Marca Nueva' },
+          linea: { id: 5, denominacion: 'Línea Nueva' },
+        });
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'MARCA NUEVA LINEA NUEVA',
+      );
+      mockUniquenessValidator.validarDenominacionUnica = jest
+        .fn()
+        .mockRejectedValue(
+          new ConflictException(
+            'La denominación "MARCA NUEVA LINEA NUEVA" ya está en uso',
+          ),
+        );
+
+      await expect(service.update(7, dto)).rejects.toThrow(ConflictException);
+      await expect(service.update(7, dto)).rejects.toThrow(
+        'La denominación "MARCA NUEVA LINEA NUEVA" ya está en uso',
+      );
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar BadRequestException cuando faltan datos obligatorios al recalcular la denominación', async () => {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'MARCA A LINEA A';
+      productoActual.denominacionManual = false;
+      productoActual.marcaId = 1;
+      productoActual.lineaId = 1;
+
+      const dto = prepararUpdate(productoActual, {
+        marcaId: 9,
+        lineaId: 5,
+      });
+
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({
+          marca: { id: 9, denominacion: '' },
+          linea: { id: 5, denominacion: '' },
+        });
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue('');
+
+      const { ProductoIntrinsicValidationService } = require(
+        '../../domain/services/producto-intrinsic-validation.service.ts',
+      );
+      const realIntrinsic = new ProductoIntrinsicValidationService();
+      mockIntrinsicValidationService.validarDatosBasicos =
+        realIntrinsic.validarDatosBasicos.bind(realIntrinsic);
+
+      await expect(service.update(7, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.update(7, dto)).rejects.toThrow(
+        'La denominación es obligatoria',
+      );
+      expect(mockRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -413,7 +788,6 @@ describe('ProductoService', () => {
         '',           // codigoReferencia
         0,            // marca_id
         0,            // linea_id
-        0,            // proveedor_id
         false,        // conStock
         0,            // skip
         10,           // take
@@ -422,7 +796,7 @@ describe('ProductoService', () => {
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         undefined,
@@ -435,14 +809,14 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
 
       await service.findBy(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         undefined,      // lineaDenominacion
         'alimentos',    // superLineaDenominacion
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         undefined,
         'alimentos',
@@ -455,14 +829,14 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
 
       await service.findBy(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         'alimentos',
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         'alimentos',
@@ -476,7 +850,7 @@ describe('ProductoService', () => {
 
       await service.findBy(
         'leche',
-        '', false, '', 0, 0, 0,
+        '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         undefined,
@@ -484,7 +858,7 @@ describe('ProductoService', () => {
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
         'leche',
-        '', false, '', 0, 0, 0,
+        '', false, '', 0, 0,
         false, 0, 10,
         'lacteos',
         undefined,
@@ -497,7 +871,7 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [], total: 0 });
 
       const resultado = await service.findBy(
-        '', '', false, '', 0, 0, 0,
+        '', '', false, '', 0, 0,
         false, 0, 10,
         'inexistente',
         undefined,
@@ -513,14 +887,14 @@ describe('ProductoService', () => {
       mockRepository.findBy.mockResolvedValue({ data: [mockProducto], total: 1 });
 
       await service.findBy(
-        '', '', false, '', 0, 5, 0,
+        '', '', false, '', 0, 5,
         false, 0, 10,
         undefined,      // lineaDenominacion
         undefined,      // superLineaDenominacion
       );
 
       expect(mockRepository.findBy).toHaveBeenCalledWith(
-        '', '', false, '', 0, 5, 0,
+        '', '', false, '', 0, 5,
         false, 0, 10,
         undefined,
         undefined,

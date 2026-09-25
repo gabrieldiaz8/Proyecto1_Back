@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from 'src/modules/common/decorators/transactional.decoratos';
 import { DatabaseConnectionException } from 'src/modules/common/exceptions/database-connection.exception';
@@ -10,7 +16,7 @@ import { Producto } from '../../domain/entities/producto.entity';
 import { IProductoRepository } from '../../domain/interfaces/producto.repository-interface';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
 import { ProductoMapper } from '../../mappers/producto.mapper';
-import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 import { IHistorialPrecioRepository } from 'src/modules/gestion-productos/historial-precio/domain/interfaces/historial-precio.repository.interface';
 
 
@@ -496,13 +502,32 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
         .andWhere('producto.deletedAt IS NULL')
         .getMany();
 
+      const denominacionesGeneradas = new Set<string>();
+
       for (const producto of productos) {
-        producto.denominacion =
+        const denominacionGenerada =
           this.generadorDenominacionService.generarDenominacion(
             nuevaDenominacion,
             producto.linea?.denominacion ?? '',
             producto.getPresentacionDescripcion() ?? undefined,
           );
+
+        if (denominacionesGeneradas.has(denominacionGenerada)) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" colisiona con otro producto regenerado en el mismo lote.`,
+          );
+        }
+
+        if (
+          await this.existsByDenominacion(denominacionGenerada, producto.id)
+        ) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" generada colisiona con un producto existente.`,
+          );
+        }
+
+        denominacionesGeneradas.add(denominacionGenerada);
+        producto.denominacion = denominacionGenerada;
       }
 
       if (productos.length > 0) {
@@ -537,13 +562,32 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
         .andWhere('producto.deletedAt IS NULL')
         .getMany();
 
+      const denominacionesGeneradas = new Set<string>();
+
       for (const producto of productos) {
-        producto.denominacion =
+        const denominacionGenerada =
           this.generadorDenominacionService.generarDenominacion(
             producto.marca?.denominacion ?? '',
             nuevaDenominacion,
             producto.getPresentacionDescripcion() ?? undefined,
           );
+
+        if (denominacionesGeneradas.has(denominacionGenerada)) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" colisiona con otro producto regenerado en el mismo lote.`,
+          );
+        }
+
+        if (
+          await this.existsByDenominacion(denominacionGenerada, producto.id)
+        ) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" generada colisiona con un producto existente.`,
+          );
+        }
+
+        denominacionesGeneradas.add(denominacionGenerada);
+        producto.denominacion = denominacionGenerada;
       }
 
       if (productos.length > 0) {

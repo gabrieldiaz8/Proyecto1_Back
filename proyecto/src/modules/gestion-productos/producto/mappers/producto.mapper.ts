@@ -79,6 +79,8 @@ export class ProductoMapper {
     usuario: Usuario,
     denominacionResuelta?: string,
     denominacionManual?: boolean,
+    presentacionCantidad?: number | null,
+    presentacionUnidadMedida?: UnidadMedida | null,
   ) {
     return {
       denominacion:
@@ -113,8 +115,8 @@ export class ProductoMapper {
       cantidadPorPack: dto.cantidadPorPack,
       imagen: undefined, // No está en el DTO
       ubicacion: dto.ubicacion,
-      presentacionCantidad: dto.presentacionCantidad,
-      presentacionUnidadMedida: dto.presentacionUnidadMedida,
+      presentacionCantidad,
+      presentacionUnidadMedida,
     };
   }
 

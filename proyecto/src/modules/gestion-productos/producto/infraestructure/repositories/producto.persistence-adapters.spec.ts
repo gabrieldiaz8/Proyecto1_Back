@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ProductoPersistenceAdapter } from './producto.persistence-adapters';
 import { Producto } from '../../domain/entities/producto.entity';
-import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 
 describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
   let adapter: ProductoPersistenceAdapter;
@@ -56,7 +56,7 @@ describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
     mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
     await adapter.findBy(
-      '', '', false, '', 0, 0, 0,
+      '', '', false, '', 0, 0,
       false, 0, 10,
       'lacteos',
       'alimentos',
@@ -100,7 +100,7 @@ describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
     mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
     const resultado = await adapter.findBy(
-      '', '', false, '', 0, 0, 0,
+      '', '', false, '', 0, 0,
       false, 0, 10,
       'a%ONDE_',
       undefined,
@@ -120,7 +120,7 @@ describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
     mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
     const resultado = await adapter.findBy(
-      'inexistente', '', false, '', 0, 0, 0,
+      'inexistente', '', false, '', 0, 0,
       false, 0, 10,
       'inexistenteLínea',
       undefined,
@@ -135,7 +135,7 @@ describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
     mockQueryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
 
     await adapter.findBy(
-      '', '', false, '', 0, 5, 0,
+      '', '', false, '', 0, 5,
       false, 0, 10,
       undefined,
       undefined,

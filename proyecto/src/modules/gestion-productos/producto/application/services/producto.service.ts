@@ -30,7 +30,7 @@ import { ProductoUniquenessValidator } from '../../infraestructure/validators/pr
 import { UsuarioValidator } from 'src/modules/common/utils/validation/usuario-validator';
 import { ProductoDeletePolicy } from '../policies/producto-delete.policy';
 import { UnidadMedida } from '../../domain/enums/unidad-medida.enum';
-import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 import { Presentacion } from '../../domain/value-objects/presentacion.vo';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import {
@@ -110,8 +110,16 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
 
     // La validación obtiene el producto actual: si no existe, lanza
     // NotFoundException.
-    const { marca, linea, usuario, productoActual, denominacion, denominacionManual } =
-      await this.validarYPrepararActualizacion(id, dto);
+    const {
+      marca,
+      linea,
+      usuario,
+      productoActual,
+      denominacion,
+      denominacionManual,
+      presentacionCantidad,
+      presentacionUnidadMedida,
+    } = await this.validarYPrepararActualizacion(id, dto);
 
     const cambios = ProductoMapper.toCambiosActualizacion(
       dto,
@@ -120,6 +128,8 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
       usuario,
       denominacion,
       denominacionManual,
+      presentacionCantidad,
+      presentacionUnidadMedida,
     );
 
     productoActual.actualizarDatos(cambios);
@@ -447,7 +457,9 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
       productoActual.lineaId == null ||
       productoActual.marcaId == null
     ) {
-      throw new InternalServerErrorException('Producto en estado inválido');
+      throw new BadRequestException(
+        'El producto no posee una Marca o Línea válida asociada para realizar la operación',
+      );
     }
 
     // Presentación: si no se envió se conserva el valor actual.
@@ -474,23 +486,47 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
       );
 
     // 2 Resolver denominación (manual o automática)
-    const denominacionManual = this.denominacionEsManual(dto.denominacion)
-      ? true
-      : productoActual.denominacionManual;
+    // Se distingue entre denominación ausente (undefined → se conserva el
+    // estado actual del producto) y denominación explícitamente vaciada
+    // (→ reversión a denominación automática, CP-CR005-B-04).
+    let denominacionManual = productoActual.denominacionManual;
+    if (dto.denominacion !== undefined) {
+      denominacionManual = this.denominacionEsManual(dto.denominacion);
+    }
 
-    let denominacion = this.denominacionEsManual(dto.denominacion)
+    const manualEnDto = this.denominacionEsManual(dto.denominacion);
+    let denominacion = manualEnDto
       ? (dto.denominacion as string)
       : productoActual.denominacion;
 
     if (!denominacionManual) {
-      denominacion = this.generadorDenominacionService.generarDenominacion(
-        marca.denominacion,
-        linea.denominacion,
-        this.obtenerPresentacionDescripcion(
-          presentacionCantidad,
-          presentacionUnidadMedida,
-        ),
-      );
+      const cambianComponentes =
+        (dto.marcaId !== undefined &&
+          dto.marcaId !== productoActual.marcaId) ||
+        (dto.lineaId !== undefined &&
+          dto.lineaId !== productoActual.lineaId) ||
+        (presentacionCantidad ?? null) !==
+          (productoActual.presentacionCantidad ?? null) ||
+        (presentacionUnidadMedida ?? null) !==
+          (productoActual.presentacionUnidadMedida ?? null);
+
+      // Al revertir de manual a automática se regenera la denominación aunque
+      // no cambien los componentes de la misma (CP-CR005-B-04).
+      const reverteAAutomatico =
+        dto.denominacion !== undefined &&
+        productoActual.denominacionManual &&
+        !denominacionManual;
+
+      if (cambianComponentes || reverteAAutomatico) {
+        denominacion = this.generadorDenominacionService.generarDenominacion(
+          marca.denominacion,
+          linea.denominacion,
+          this.obtenerPresentacionDescripcion(
+            presentacionCantidad,
+            presentacionUnidadMedida,
+          ),
+        );
+      }
     }
 
     // 3 Validar datos intrínsecos
@@ -504,13 +540,8 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
       presentacionUnidadMedida,
     });
 
-    // 4 Validar unicidad (excluyendo el ID actual)
-    if (dto.denominacion) {
-      await this.uniquenessValidator.validarDenominacionUnica(
-        dto.denominacion,
-        id,
-      );
-    }
+    // 4 Validar unicidad (excluyendo el ID actual) sobre la denominación final
+    await this.uniquenessValidator.validarDenominacionUnica(denominacion, id);
 
     // 5 Validar reglas de negocio sobre entidades
     this.validationService.validarEntidadesRelacionadas(
@@ -523,7 +554,16 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
       dto.usuarioUpdatedId,
     );
 
-    return { marca, linea, usuario, productoActual, denominacion, denominacionManual };
+    return {
+      marca,
+      linea,
+      usuario,
+      productoActual,
+      denominacion,
+      denominacionManual,
+      presentacionCantidad,
+      presentacionUnidadMedida,
+    };
   }
 
   private denominacionEsManual(denominacion?: string): boolean {

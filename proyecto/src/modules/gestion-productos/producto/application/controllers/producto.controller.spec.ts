@@ -5,20 +5,16 @@ import { ProductoController } from './producto.controller';
 import { ProductoService } from '../services/producto.service';
 import { HistorialPrecioService } from 'src/modules/gestion-productos/historial-precio/application/services/historial-precio.service';
 import { SearchProductoPaginationWithDto } from '../../dto/search-producto-pagination-with.dto';
-import { AuthGuard } from 'src/modules/gestion-usuario/auth/auth.guard';
 
 describe('ProductoController', () => {
   let controller: ProductoController;
   let productoService: jest.Mocked<Partial<ProductoService>>;
   let historialPrecioService: jest.Mocked<Partial<HistorialPrecioService>>;
 
-  const mockService = {
-    findBy: jest.fn(),
-  };
-
   beforeEach(async () => {
     productoService = {
       actualizarPrecio: jest.fn(),
+      findBy: jest.fn(),
     };
 
     historialPrecioService = {
@@ -85,12 +81,14 @@ describe('ProductoController', () => {
 
       expect(historialPrecioService.findByProducto).toHaveBeenCalledWith(1, 0, 10);
       expect(resultado).toBe(respuestaEsperada);
+    });
+  });
 
   // CR-004: search() — propagación de lineaDenominacion y superLineaDenominacion
 
   describe('search() — CR-004', () => {
     it('debería pasar lineaDenominacion al service cuando se recibe en el DTO', async () => {
-      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+      (productoService as any).findBy.mockResolvedValue({ data: [], total: 0 });
 
       const dto = new SearchProductoPaginationWithDto();
       dto.skip = 0;
@@ -99,14 +97,13 @@ describe('ProductoController', () => {
 
       await controller.search(dto);
 
-      expect(mockService.findBy).toHaveBeenCalledWith(
+      expect(productoService.findBy).toHaveBeenCalledWith(
         '',           // denominacion default
         undefined,    // codigoProveedor
         false,        // codProveedorExacto (default del DTO)
         undefined,    // codigoReferencia
         undefined,    // marcaId
         undefined,    // lineaId
-        undefined,    // proveedorId
         undefined,    // conStock
         0,
         10,
@@ -116,7 +113,7 @@ describe('ProductoController', () => {
     });
 
     it('debería pasar superLineaDenominacion al service cuando se recibe en el DTO', async () => {
-      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+      (productoService as any).findBy.mockResolvedValue({ data: [], total: 0 });
 
       const dto = new SearchProductoPaginationWithDto();
       dto.skip = 0;
@@ -125,8 +122,8 @@ describe('ProductoController', () => {
 
       await controller.search(dto);
 
-      expect(mockService.findBy).toHaveBeenCalledWith(
-        '', undefined, false, undefined, undefined, undefined, undefined,
+      expect(productoService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, undefined,
         undefined, 0, 10,
         undefined,      // lineaDenominacion
         'SALADOS',      // superLineaDenominacion ✓
@@ -134,7 +131,7 @@ describe('ProductoController', () => {
     });
 
     it('debería pasar undefined para lineaDenominacion y superLineaDenominacion cuando no vienen en el DTO', async () => {
-      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+      (productoService as any).findBy.mockResolvedValue({ data: [], total: 0 });
 
       const dto = new SearchProductoPaginationWithDto();
       dto.skip = 0;
@@ -142,8 +139,8 @@ describe('ProductoController', () => {
 
       await controller.search(dto);
 
-      expect(mockService.findBy).toHaveBeenCalledWith(
-        '', undefined, false, undefined, undefined, undefined, undefined,
+      expect(productoService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, undefined,
         undefined, 0, 10,
         undefined,    // lineaDenominacion → undefined ✓
         undefined,    // superLineaDenominacion → undefined ✓
@@ -151,7 +148,7 @@ describe('ProductoController', () => {
     });
 
     it('debería pasar ambos params (lineaDenominacion + superLineaDenominacion) juntos en un solo search', async () => {
-      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+      (productoService as any).findBy.mockResolvedValue({ data: [], total: 0 });
 
       const dto = new SearchProductoPaginationWithDto();
       dto.skip = 0;
@@ -161,8 +158,8 @@ describe('ProductoController', () => {
 
       await controller.search(dto);
 
-      expect(mockService.findBy).toHaveBeenCalledWith(
-        '', undefined, false, undefined, undefined, undefined, undefined,
+      expect(productoService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, undefined,
         undefined, 0, 10,
         'lacteos',      // lineaDenominacion ✓
         'alimentos',    // superLineaDenominacion ✓
@@ -170,7 +167,7 @@ describe('ProductoController', () => {
     });
 
     it('debería pasar solo lineaId sin params de texto (retrocompatibilidad)', async () => {
-      mockService.findBy.mockResolvedValue({ data: [], total: 0 });
+      (productoService as any).findBy.mockResolvedValue({ data: [], total: 0 });
 
       const dto = new SearchProductoPaginationWithDto();
       dto.skip = 0;
@@ -179,8 +176,8 @@ describe('ProductoController', () => {
 
       await controller.search(dto);
 
-      expect(mockService.findBy).toHaveBeenCalledWith(
-        '', undefined, false, undefined, undefined, 5, undefined,
+      expect(productoService.findBy).toHaveBeenCalledWith(
+        '', undefined, false, undefined, undefined, 5,
         undefined, 0, 10,
         undefined,    // lineaDenominacion → undefined ✓
         undefined,    // superLineaDenominacion → undefined ✓

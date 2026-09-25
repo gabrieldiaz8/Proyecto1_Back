@@ -1,3 +1,4 @@
+import { TipoRegistro } from 'src/modules/common/enums/tipo-registro.enum';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DatabaseConnectionException } from 'src/modules/common/exceptions/database-connection.exception';
@@ -229,7 +230,7 @@ export class LineaPersistenceAdapter
         .createQueryBuilder('linea')
         .leftJoinAndSelect('linea.superLinea', 'superLinea')
         .where('linea.deletedAt IS NULL')
-        .andWhere('linea.sistema = :sistema', { sistema: 0 });
+        .andWhere('linea.sistema = :sistema', { sistema: TipoRegistro.USUARIO });
       if (denominacion && denominacion.trim() !== '') {
         query.andWhere('UPPER(linea.denominacion) LIKE :denominacion', {
           denominacion: `%${denominacion.toUpperCase()}%`,
@@ -317,3 +318,4 @@ export class LineaPersistenceAdapter
     }
   }
 }
+

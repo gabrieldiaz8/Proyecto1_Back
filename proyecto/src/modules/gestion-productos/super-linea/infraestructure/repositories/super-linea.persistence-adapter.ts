@@ -1,3 +1,4 @@
+import { TipoRegistro } from 'src/modules/common/enums/tipo-registro.enum';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -207,7 +208,7 @@ export class SuperLineaPersistenceAdapter
       const query = this.repository
         .createQueryBuilder('super_linea')
         .where('super_linea.deletedAt IS NULL')
-        .andWhere('super_linea.sistema = :sistema', { sistema: 0 });
+        .andWhere('super_linea.sistema = :sistema', { sistema: TipoRegistro.USUARIO });
 
       if (denominacion && denominacion.trim() !== '') {
         query.andWhere('UPPER(super_linea.denominacion) LIKE :denominacion', {
@@ -229,7 +230,7 @@ export class SuperLineaPersistenceAdapter
       const query = this.repository
         .createQueryBuilder('super_linea')
         .where('super_linea.deletedAt IS NULL')
-        .andWhere('super_linea.sistema = :sistema', { sistema: 1 });
+        .andWhere('super_linea.sistema = :sistema', { sistema: TipoRegistro.SISTEMA });
 
       if (denominacion && denominacion.trim() !== '') {
         query.andWhere('UPPER(super_linea.denominacion) LIKE :denominacion', {

@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ProductoPersistenceAdapter } from './producto.persistence-adapters';
 import { Producto } from '../../domain/entities/producto.entity';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
 
 describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
   let adapter: ProductoPersistenceAdapter;
@@ -21,6 +22,15 @@ describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
     createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder) as jest.Mock<any>,
   };
 
+  const mockHistorialRepo = {
+    save: jest.fn(),
+    findByProducto: jest.fn(),
+  };
+
+  const mockGeneradorDenominacion = {
+    generarDenominacion: jest.fn(),
+  };
+
   const llamadasDeAndWhere = () =>
     mockQueryBuilder.andWhere.mock.calls as any[];
 
@@ -31,6 +41,8 @@ describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
         { provide: getRepositoryToken(Producto), useValue: mockRepository },
         { provide: DataSource, useValue: {} },
         { provide: 'UnitOfWork', useValue: {} },
+        { provide: GeneradorDenominacionService, useValue: mockGeneradorDenominacion },
+        { provide: 'IHistorialPrecioRepository', useValue: mockHistorialRepo },
       ],
     }).compile();
 

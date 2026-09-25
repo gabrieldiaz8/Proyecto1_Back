@@ -1,5 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { Producto } from './producto.entity';
+import { Denominacion } from '../value-objects/denominacion.vo';
+import { Costo } from '../value-objects/costo.vo';
+import { Porcentaje } from '../value-objects/porcentaje.vo';
+import { Linea } from '../../../linea/domain/entities/linea.entity';
+import { Marca } from '../../../marca/domain/entities/marca.entity';
+import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
+import { AlicuotaIva } from 'src/modules/organizacion/enums/alicuota-iva.enum';
 
 describe('Producto.cambiarPrecio', () => {
   let producto: Producto;
@@ -32,7 +39,8 @@ describe('Producto.cambiarPrecio', () => {
   it('no lanza ni modifica el precio cuando recibe null', () => {
     producto.cambiarPrecio(null);
     expect(producto.precio).toBe(100);
-import { Producto } from './producto.entity';
+  });
+});
 
 describe('Producto - métodos de ajuste de precio (CR-006)', () => {
   /**
@@ -289,5 +297,99 @@ describe('Producto - métodos de ajuste de precio (CR-006)', () => {
         'El costo recalculado debe ser mayor que 0.',
       );
     });
+  });
+});
+
+// =========================================================================
+// Producto.crear() - cálculo de precio con VOs  (CR-001)
+// =========================================================================
+describe('Producto.crear()', () => {
+  /**
+   * Construye un producto completo vía Producto.crear() con los VOs
+   * y relaciones mínimas que la firma del método exige.
+   */
+  function crearProductoCompleto(costo?: number, porcentaje?: number): Producto {
+    return Producto.crear({
+      denominacion: new Denominacion('Producto Test'),
+      costo: new Costo(costo ?? 100),
+      porcentaje: new Porcentaje(porcentaje ?? 25),
+      alicuotaIva: AlicuotaIva.ALICUOTA_21,
+      utilizaStockMinimo: false,
+      linea: new Linea(),
+      marca: new Marca(),
+      usuarioCreated: new Usuario(),
+      utilizaPack: false,
+    });
+  }
+
+  it('debería calcular precio = costo * (1 + porcentaje/100) con costo y porcentaje válidos', () => {
+    // costo 100, porcentaje 25 → 100 * 1.25 = 125
+    const producto = crearProductoCompleto(100, 25);
+    expect(producto.precio).toBe(125);
+    expect(producto.costo).toBe(100);
+    expect(producto.porcentaje).toBe(25);
+  });
+
+  it('debería dejar precio === costo cuando el porcentaje es 0', () => {
+    // costo 100, porcentaje 0 → 100 * 1 = 100
+    const producto = crearProductoCompleto(100, 0);
+    expect(producto.precio).toBe(100);
+    expect(producto.precio).toBe(producto.costo);
+  });
+
+  it('debería aceptar costo 0 y calcular precio 0 sin lanzar error', () => {
+    // costo 0, porcentaje 25 → 0 * 1.25 = 0
+    const producto = crearProductoCompleto(0, 25);
+    expect(producto.precio).toBe(0);
+    expect(producto.costo).toBe(0);
+  });
+});
+
+// =========================================================================
+// Producto.actualizarDatos() - recálculo de precio  (CR-001)
+// =========================================================================
+describe('Producto.actualizarDatos()', () => {
+  /**
+   * Producto con costo 100, porcentaje 25 y precio inicial 125.
+   */
+  function crearProductoConPrecioInicial(): Producto {
+    return Producto.crear({
+      denominacion: new Denominacion('Producto Test'),
+      costo: new Costo(100),
+      porcentaje: new Porcentaje(25),
+      alicuotaIva: AlicuotaIva.ALICUOTA_21,
+      utilizaStockMinimo: false,
+      linea: new Linea(),
+      marca: new Marca(),
+      usuarioCreated: new Usuario(),
+      utilizaPack: false,
+    });
+  }
+
+  it('debería recalcular el precio usando el porcentaje existente si se actualiza el costo', () => {
+    // costo 200, porcentaje existente 25 → 200 * 1.25 = 250
+    const producto = crearProductoConPrecioInicial();
+    producto.actualizarDatos({ costo: new Costo(200) });
+    expect(producto.costo).toBe(200);
+    expect(producto.porcentaje).toBe(25);
+    expect(producto.precio).toBe(250);
+  });
+
+  it('debería recalcular el precio usando el costo existente si se actualiza el porcentaje', () => {
+    // costo existente 100, porcentaje 50 → 100 * 1.50 = 150
+    const producto = crearProductoConPrecioInicial();
+    producto.actualizarDatos({ porcentaje: new Porcentaje(50) });
+    expect(producto.costo).toBe(100);
+    expect(producto.porcentaje).toBe(50);
+    expect(producto.precio).toBe(150);
+  });
+
+  it('debería mantener el precio sin recalcular si no se actualiza ni costo ni porcentaje', () => {
+    // solo se actualiza el stock; precio/costo/porcentaje deben quedar intactos
+    const producto = crearProductoConPrecioInicial();
+    producto.actualizarDatos({ stock: 10 });
+    expect(producto.precio).toBe(125);
+    expect(producto.costo).toBe(100);
+    expect(producto.porcentaje).toBe(25);
   });
 });

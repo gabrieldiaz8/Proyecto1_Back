@@ -19,6 +19,10 @@ import { MonetarioColumn } from 'src/modules/common/decorators/monetario-column.
 import { CantidadColumn } from 'src/modules/common/decorators/cantidad-column.decorator';
 import { PorcentajeColumn } from 'src/modules/common/decorators/porcentaje-column.decorator';
 import { Proveedor } from 'src/modules/organizacion/proveedor/domain/entities/proveedor.entity';
+import { Denominacion } from '../value-objects/denominacion.vo';
+import { Costo } from '../value-objects/costo.vo';
+import { Porcentaje } from '../value-objects/porcentaje.vo';
+import { Precio } from '../value-objects/precio.vo';
 import { UnidadMedida } from '../enums/unidad-medida.enum';
 import { Presentacion } from '../value-objects/presentacion.vo';
 
@@ -231,6 +235,243 @@ export class Producto {
 
   @Column({ type: 'text', nullable: true })
   codigoReferencia?: string | null;
+
+// ========== CR-001: MÉTODOS DE CREACIÓN Y ACTUALIZACIÓN CON VOS ==========
+
+  static crear(datos: {
+    denominacion: Denominacion;
+    costo: Costo;
+    porcentaje: Porcentaje;
+    codigoProveedor?: string;
+    codigoBarra?: string;
+    codigoReferencia?: string;
+    alicuotaIva: AlicuotaIva;
+    stock?: number;
+    utilizaStockMinimo: boolean;
+    utilizaStockMinimoPorEmpresa?: boolean;
+    stockMinimo?: number;
+    costoDolar?: number;
+    cotizacionDolar?: number;
+    precioDolar?: number;
+    fechaCosto?: Date;
+    costoEnDolar?: boolean;
+    fechaCostoDolar?: Date;
+    destacado?: boolean;
+    envioGratis?: boolean;
+    observacion?: string;
+    linea: Linea;
+    marca: Marca;
+    usuarioCreated: Usuario;
+    utilizaPack: boolean;
+    cantidadPorPack?: number | null;
+    imagen?: string;
+    ubicacion?: string;
+    sistema?: number;
+    denominacionManual?: boolean;
+    presentacionCantidad?: number | null;
+    presentacionUnidadMedida?: UnidadMedida | null;
+  }): Producto {
+    const producto = new Producto();
+
+    // VOs → primitivos
+    producto.denominacion = datos.denominacion.valor;
+    producto.costo = datos.costo.valor;
+    producto.porcentaje = datos.porcentaje.valor;
+
+    // Calcular precio usando VOs
+    const precioCalculado = Precio.calcular(datos.costo, datos.porcentaje);
+    producto.precio = precioCalculado.valor;
+
+    // Resto de campos del DTO
+    producto.denominacionManual =
+      datos.denominacionManual ?? false;
+    producto.codigoProveedor = datos.codigoProveedor ?? null;
+    producto.codigoBarra = datos.codigoBarra ?? null;
+    producto.codigoReferencia = datos.codigoReferencia ?? null;
+    producto.alicuotaIva = datos.alicuotaIva;
+    producto.stock = datos.stock ?? 0;
+    producto.utilizaStockMinimo = datos.utilizaStockMinimo;
+    producto.utilizaStockMinimoPorEmpresa = datos.utilizaStockMinimoPorEmpresa ?? false;
+    producto.stockMinimo = datos.stockMinimo ?? 0;
+    producto.costoDolar = datos.costoDolar;
+    producto.cotizacionDolar = datos.cotizacionDolar;
+    producto.precioDolar = datos.precioDolar;
+    producto.fechaCosto = datos.fechaCosto;
+    producto.costoEnDolar = datos.costoEnDolar ?? false;
+    producto.fechaCostoDolar = datos.fechaCostoDolar;
+    producto.destacado = datos.destacado ?? false;
+    producto.envioGratis = datos.envioGratis ?? false;
+    producto.observacion = datos.observacion;
+    producto.utilizaPack = datos.utilizaPack;
+    producto.cantidadPorPack = datos.cantidadPorPack ?? null;
+    producto.imagen = datos.imagen;
+    producto.ubicacion = datos.ubicacion;
+    producto.sistema = datos.sistema ?? 0;
+    if (datos.presentacionCantidad !== undefined) {
+      producto.presentacionCantidad = datos.presentacionCantidad;
+    }
+    if (datos.presentacionUnidadMedida !== undefined) {
+      producto.presentacionUnidadMedida = datos.presentacionUnidadMedida;
+    }
+
+    // Relaciones (ya resueltas en el service)
+    producto.linea = datos.linea;
+    producto.lineaId = datos.linea?.id;
+    producto.marca = datos.marca;
+    producto.marcaId = datos.marca?.id;
+    producto.usuarioCreated = datos.usuarioCreated;
+
+    return producto;
+  }
+
+  actualizarDatos(datos: {
+    denominacion?: Denominacion;
+    costo?: Costo;
+    porcentaje?: Porcentaje;
+    codigoProveedor?: string;
+    codigoBarra?: string;
+    codigoReferencia?: string;
+    alicuotaIva?: AlicuotaIva;
+    stock?: number;
+    utilizaStockMinimo?: boolean;
+    utilizaStockMinimoPorEmpresa?: boolean;
+    stockMinimo?: number;
+    costoDolar?: number;
+    cotizacionDolar?: number;
+    precioDolar?: number;
+    fechaCosto?: Date;
+    costoEnDolar?: boolean;
+    fechaCostoDolar?: Date;
+    destacado?: boolean;
+    envioGratis?: boolean;
+    observacion?: string;
+    linea?: Linea;
+    marca?: Marca;
+    usuarioUpdated?: Usuario;
+    utilizaPack?: boolean;
+    cantidadPorPack?: number | null;
+    imagen?: string;
+    ubicacion?: string;
+    denominacionManual?: boolean;
+    presentacionCantidad?: number | null;
+    presentacionUnidadMedida?: UnidadMedida | null;
+  }): void {
+    // Actualizar solo los campos que vengan definidos
+    if (datos.denominacion !== undefined) {
+      this.denominacion = datos.denominacion.valor;
+    }
+    if (datos.denominacionManual !== undefined) {
+      this.denominacionManual = datos.denominacionManual;
+    }
+
+    // Manejo especial de costo/porcentaje/precio
+    const costoVino = datos.costo !== undefined;
+    const porcentajeVino = datos.porcentaje !== undefined;
+
+    if (costoVino) {
+      this.costo = datos.costo!.valor;
+    }
+    if (porcentajeVino) {
+      this.porcentaje = datos.porcentaje!.valor;
+    }
+
+    // Recalcular precio solo si vino al menos uno de costo o porcentaje
+    if (costoVino || porcentajeVino) {
+      const costoParaCalculo = costoVino
+        ? datos.costo!
+        : new Costo(this.costo ?? 0);
+      const porcentajeParaCalculo = porcentajeVino
+        ? datos.porcentaje!
+        : new Porcentaje(this.porcentaje ?? 0);
+
+      const precioCalculado = Precio.calcular(costoParaCalculo, porcentajeParaCalculo);
+      this.precio = precioCalculado.valor;
+    }
+
+    // Resto de campos opcionales
+    if (datos.codigoProveedor !== undefined) {
+      this.codigoProveedor = datos.codigoProveedor;
+    }
+    if (datos.codigoBarra !== undefined) {
+      this.codigoBarra = datos.codigoBarra;
+    }
+    if (datos.codigoReferencia !== undefined) {
+      this.codigoReferencia = datos.codigoReferencia;
+    }
+    if (datos.alicuotaIva !== undefined) {
+      this.alicuotaIva = datos.alicuotaIva;
+    }
+    if (datos.stock !== undefined) {
+      this.stock = datos.stock;
+    }
+    if (datos.utilizaStockMinimo !== undefined) {
+      this.utilizaStockMinimo = datos.utilizaStockMinimo;
+    }
+    if (datos.utilizaStockMinimoPorEmpresa !== undefined) {
+      this.utilizaStockMinimoPorEmpresa = datos.utilizaStockMinimoPorEmpresa;
+    }
+    if (datos.stockMinimo !== undefined) {
+      this.stockMinimo = datos.stockMinimo;
+    }
+    if (datos.costoDolar !== undefined) {
+      this.costoDolar = datos.costoDolar;
+    }
+    if (datos.cotizacionDolar !== undefined) {
+      this.cotizacionDolar = datos.cotizacionDolar;
+    }
+    if (datos.precioDolar !== undefined) {
+      this.precioDolar = datos.precioDolar;
+    }
+    if (datos.fechaCosto !== undefined) {
+      this.fechaCosto = datos.fechaCosto;
+    }
+    if (datos.costoEnDolar !== undefined) {
+      this.costoEnDolar = datos.costoEnDolar;
+    }
+    if (datos.fechaCostoDolar !== undefined) {
+      this.fechaCostoDolar = datos.fechaCostoDolar;
+    }
+    if (datos.destacado !== undefined) {
+      this.destacado = datos.destacado;
+    }
+    if (datos.envioGratis !== undefined) {
+      this.envioGratis = datos.envioGratis;
+    }
+    if (datos.observacion !== undefined) {
+      this.observacion = datos.observacion;
+    }
+    if (datos.utilizaPack !== undefined) {
+      this.utilizaPack = datos.utilizaPack;
+    }
+    if (datos.cantidadPorPack !== undefined) {
+      this.cantidadPorPack = datos.cantidadPorPack;
+    }
+    if (datos.imagen !== undefined) {
+      this.imagen = datos.imagen;
+    }
+    if (datos.ubicacion !== undefined) {
+      this.ubicacion = datos.ubicacion;
+    }
+    if (datos.presentacionCantidad !== undefined) {
+      this.presentacionCantidad = datos.presentacionCantidad;
+    }
+    if (datos.presentacionUnidadMedida !== undefined) {
+      this.presentacionUnidadMedida = datos.presentacionUnidadMedida;
+    }
+
+    // Relaciones
+    if (datos.linea !== undefined) {
+      this.linea = datos.linea;
+      this.lineaId = datos.linea?.id;
+    }
+    if (datos.marca !== undefined) {
+      this.marca = datos.marca;
+      this.marcaId = datos.marca?.id;
+    }
+    if (datos.usuarioUpdated !== undefined) {
+      this.usuarioUpdated = datos.usuarioUpdated;
+    }
+  }
 
   cambiarPrecio(nuevoPrecio: number | undefined | null): void {
     if (nuevoPrecio === undefined || nuevoPrecio === null) return;

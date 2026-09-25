@@ -33,6 +33,8 @@ describe('LineaService', () => {
     validateSuperLineaExists: jest.fn() as jest.Mock<any>,
   };
 
+  const mockProductoRepository = {};
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,6 +46,7 @@ describe('LineaService', () => {
         },
         { provide: UsuarioService, useValue: mockUsuarioService },
         { provide: LineaValidationService, useValue: mockLineaValidation },
+        { provide: 'IProductoRepository', useValue: mockProductoRepository },
       ],
     }).compile();
 

@@ -2,12 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ProductoService } from './producto.service';
 import { Producto } from '../../domain/entities/producto.entity';
+import { CreateProductoDto } from '../../dto/create-producto.dto';
 import {
   AlcanceAjustePrecio,
   ModalidadAjustePrecio,
   TipoAjustePrecio,
 } from '../../enums/ajuste-precio.enum';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,7 +65,7 @@ describe('ProductoService', () => {
     findBy: jest.fn(),
     findByRapido: jest.fn(),
     findByIdWithoutRelations: jest.fn(),
-    update: jest.fn(),
+    save: jest.fn(),
     updateEntity: jest.fn(),
     actualizarPrecio: jest.fn(),
     remove: jest.fn(),
@@ -74,20 +76,22 @@ describe('ProductoService', () => {
     existsProductosActivosByMarca: jest.fn(),
     existsProductosActivosByLinea: jest.fn(),
     findByIds: jest.fn(),
-    create: jest.fn(),
   };
 
   // Mocks vacíos para todos los demás providers inyectados
-  const mockLineaService = {};
-  const mockMarcaService = {};
-  const mockProveedorService = {};
-  const mockUsuarioService = {};
-  const mockIntrinsicValidationService = {};
-  const mockValidationService = {};
-  const mockRelatedEntitiesValidator = {};
-  const mockUniquenessValidator = {};
-  const mockUsuarioValidator = {};
-  const mockProductoDeletePolicy = {};
+  const mockLineaService: Record<string, jest.Mock> = {};
+  const mockMarcaService: Record<string, jest.Mock> = {};
+  const mockProveedorService: Record<string, jest.Mock> = {};
+  const mockUsuarioService: Record<string, jest.Mock> = {};
+  const mockIntrinsicValidationService: Record<string, jest.Mock> = {};
+  const mockValidationService: Record<string, jest.Mock> = {};
+  const mockRelatedEntitiesValidator: Record<string, jest.Mock> = {};
+  const mockUniquenessValidator: Record<string, jest.Mock> = {};
+  const mockUsuarioValidator: Record<string, jest.Mock> = {};
+  const mockProductoDeletePolicy: Record<string, jest.Mock> = {};
+  const mockGeneradorDenominacionService = {
+    generarDenominacion: jest.fn().mockReturnValue('denominacion generada'),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -138,6 +142,10 @@ describe('ProductoService', () => {
           provide: require('../policies/producto-delete.policy').ProductoDeletePolicy,
           useValue: mockProductoDeletePolicy,
         },
+        {
+          provide: require('../../domain/services/generador-denominacion.service.ts').GeneradorDenominacionService,
+          useValue: mockGeneradorDenominacionService,
+        },
       ],
     }).compile();
 
@@ -146,6 +154,113 @@ describe('ProductoService', () => {
 
   it('debería estar definido', () => {
     expect(service).toBeDefined();
+  });
+
+  // ===========================================================================
+  // CR-001: create
+  // ===========================================================================
+
+  describe('create', () => {
+    function crearCreateDto(overrides: Partial<CreateProductoDto> = {}): CreateProductoDto {
+      const dto = new CreateProductoDto();
+      dto.denominacion = 'producto test';
+      dto.lineaId = 1;
+      dto.marcaId = 1;
+      dto.alicuotaIva = require('src/modules/organizacion/enums/alicuota-iva.enum').AlicuotaIva.ALICUOTA_21;
+      dto.usuarioCreatedId = 1;
+      dto.utilizaStockMinimo = false;
+      dto.utilizaPack = false;
+      dto.costo = 100;
+      dto.porcentaje = 25;
+      dto.precio = 125;
+      return Object.assign(dto, overrides);
+    }
+
+    it('debería lanzar NotFoundException cuando lineaId no existe y no llamar a save', async () => {
+      const dto = crearCreateDto({ lineaId: 999 });
+
+      // intrinsicValidation no lanza
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      // uniqueness no lanza
+      mockUniquenessValidator.validarDenominacionUnica = jest.fn().mockResolvedValue(undefined);
+      // relatedEntities lanza NotFoundException (línea no existe)
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockRejectedValue(
+          new (require('@nestjs/common').NotFoundException)('Línea con ID 999 no encontrada'),
+        );
+
+      await expect(service.create(dto)).rejects.toThrow(
+        require('@nestjs/common').NotFoundException,
+      );
+      await expect(service.create(dto)).rejects.toThrow('Línea con ID 999 no encontrada');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar NotFoundException cuando marcaId no existe y no llamar a save', async () => {
+      const dto = crearCreateDto({ marcaId: 888 });
+
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockUniquenessValidator.validarDenominacionUnica = jest.fn().mockResolvedValue(undefined);
+      // relatedEntities lanza NotFoundException (marca no existe)
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockRejectedValue(
+          new (require('@nestjs/common').NotFoundException)('Marca con ID 888 no encontrada'),
+        );
+
+      await expect(service.create(dto)).rejects.toThrow(
+        require('@nestjs/common').NotFoundException,
+      );
+      await expect(service.create(dto)).rejects.toThrow('Marca con ID 888 no encontrada');
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería llamar a repository.save cuando los datos son válidos', async () => {
+      const dto = crearCreateDto();
+
+      const mockLinea = { id: 1, denominacion: 'Línea A' };
+      const mockMarca = { id: 1, denominacion: 'Marca A' };
+      const mockUsuario = { id: 1, nombre: 'admin' };
+
+      mockIntrinsicValidationService.validarDatosBasicos = jest.fn();
+      mockUniquenessValidator.validarDenominacionUnica = jest.fn().mockResolvedValue(undefined);
+      mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
+        .fn()
+        .mockResolvedValue({ marca: mockMarca, linea: mockLinea });
+      mockValidationService.validarEntidadesRelacionadas = jest.fn();
+      mockUsuarioValidator.validarUsuarioExiste = jest.fn().mockResolvedValue(mockUsuario);
+
+      const entityGuardada = new (require('../../domain/entities/producto.entity').Producto)();
+      entityGuardada.denominacion = dto.denominacion;
+      mockRepository.save.mockResolvedValue(entityGuardada);
+
+      await service.create(dto);
+
+      expect(mockRepository.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ===========================================================================
+  // CR-001: update
+  // ===========================================================================
+
+  describe('update', () => {
+    it('debería lanzar NotFoundException cuando el producto a actualizar no existe', async () => {
+      // findOne retorna null → producto no existe
+      mockRepository.findOne.mockResolvedValue(null);
+
+      const { UpdateProductoDto } = require('../../dto/update-producto.dto');
+      const dto = new UpdateProductoDto();
+      dto.usuarioUpdatedId = 1;
+
+      await expect(service.update(999, dto)).rejects.toThrow(
+        require('@nestjs/common').NotFoundException,
+      );
+      await expect(service.update(999, dto)).rejects.toThrow(
+        'Producto con ID 999 no encontrado.',
+      );
+    });
   });
 
   // ===========================================================================

@@ -78,39 +78,49 @@ export class ProductoService {
     const { data, marca, linea, usuario } =
       await this.validarYPrepararCreacion(dto);
 
-    const entity = await this.repository.create(
-      data,
+    // Construir la entidad a partir del DTO (usa la denominación resuelta)
+    const entity = ProductoMapper.toNewEntity(
+      dto,
       linea,
       marca,
-
       usuario,
+      data.denominacion,
+      data.denominacionManual,
     );
 
+    // Persistir
+    const entityGuardada = await this.repository.save(entity);
     return MessageFrontUtils.createSimple(
       `${this.ENTITY_NAME}`,
-      entity.denominacion,
+      entityGuardada.denominacion,
       'creada',
     );
   }
 
   async update(id: number, dto: UpdateProductoDto) {
-    this.logger.log(`Actualizando ${this.ENTITY_NAME} con ID: ${id}`);
+this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
 
-    const { data, marca, linea, usuario } =
+    // La validación obtiene el producto actual: si no existe, lanza
+    // NotFoundException.
+    const { marca, linea, usuario, productoActual, denominacion, denominacionManual } =
       await this.validarYPrepararActualizacion(id, dto);
 
-    const entity = await this.repository.update(
-      id,
-      data,
+    const cambios = ProductoMapper.toCambiosActualizacion(
+      dto,
       linea,
       marca,
-
       usuario,
+      denominacion,
+      denominacionManual,
     );
+
+    productoActual.actualizarDatos(cambios);
+
+    const entityActualizada = await this.repository.save(productoActual);
 
     return MessageFrontUtils.createSimple(
       `${this.ENTITY_NAME}`,
-      entity.denominacion,
+      entityActualizada.denominacion,
       'editada',
     );
   }
@@ -488,9 +498,7 @@ export class ProductoService {
       dto.usuarioUpdatedId,
     );
 
-    const data = { ...dto, denominacion, denominacionManual };
-
-    return { data, marca, linea, usuario };
+    return { marca, linea, usuario, productoActual, denominacion, denominacionManual };
   }
 
   private denominacionEsManual(denominacion?: string): boolean {

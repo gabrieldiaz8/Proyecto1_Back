@@ -46,10 +46,15 @@ describe('ProductoPersistenceAdapter.actualizarPrecio', () => {
       findByProducto: jest.fn(),
     };
 
+    const mockGeneradorDenominacion = {
+      generarDenominacion: jest.fn(),
+    };
+
     adapter = new ProductoPersistenceAdapter(
       null as any,
       null as any,
       mockUow,
+      mockGeneradorDenominacion as any,
       mockHistorialRepo,
     );
 

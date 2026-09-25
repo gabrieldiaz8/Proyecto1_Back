@@ -30,7 +30,7 @@ import { ProductoUniquenessValidator } from '../../infraestructure/validators/pr
 import { UsuarioValidator } from 'src/modules/common/utils/validation/usuario-validator';
 import { ProductoDeletePolicy } from '../policies/producto-delete.policy';
 import { UnidadMedida } from '../../domain/enums/unidad-medida.enum';
-import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 import { Presentacion } from '../../domain/value-objects/presentacion.vo';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import {

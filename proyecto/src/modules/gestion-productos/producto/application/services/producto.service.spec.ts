@@ -9,7 +9,7 @@ import {
   TipoAjustePrecio,
 } from '../../enums/ajuste-precio.enum';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
-import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -143,7 +143,7 @@ describe('ProductoService', () => {
           useValue: mockProductoDeletePolicy,
         },
         {
-          provide: require('../../domain/services/generador-denominacion.service.ts').GeneradorDenominacionService,
+          provide: require('../../domain/services/generador-denominacion.service').GeneradorDenominacionService,
           useValue: mockGeneradorDenominacionService,
         },
       ],

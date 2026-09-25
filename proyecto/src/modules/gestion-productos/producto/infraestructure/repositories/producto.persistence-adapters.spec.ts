@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ProductoPersistenceAdapter } from './producto.persistence-adapters';
 import { Producto } from '../../domain/entities/producto.entity';
-import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 
 describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
   let adapter: ProductoPersistenceAdapter;

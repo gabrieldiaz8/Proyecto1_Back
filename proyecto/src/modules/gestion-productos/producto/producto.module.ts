@@ -18,7 +18,7 @@ import { ProductoUniquenessValidator } from './infraestructure/validators/produc
 import { ProductoRelatedEntitiesValidator } from './infraestructure/validators/producto-related-entities.validator.ts';
 import { ProductoValidationService } from './domain/services/producto-validation.service.ts';
 import { ProductoIntrinsicValidationService } from './domain/services/producto-intrinsic-validation.service.ts';
-import { GeneradorDenominacionService } from './domain/services/generador-denominacion.service.ts';
+import { GeneradorDenominacionService } from './domain/services/generador-denominacion.service';
 import { ProductoDeletePolicy } from './application/policies/producto-delete.policy';
 
 

@@ -801,7 +801,13 @@ describe('ProductoService', () => {
       expect(resultado.actualizadosExitosamente).toBe(2);
       expect(resultado.excluidos).toEqual([]);
       expect(mockRepository.saveMany).toHaveBeenCalledTimes(1);
-      expect(mockRepository.saveMany).toHaveBeenCalledWith([producto1, producto2]);
+      // El precio previo se captura antes de aplicar el ajuste: los fixtures
+      // traeían 1000 y 500, y después del +100 de monto ya valen 1100 y 600.
+      expect(mockRepository.saveMany).toHaveBeenCalledWith(
+        [producto1, producto2],
+        new Map([[1, 1000], [2, 500]]),
+        dto,
+      );
       expect(mockRepository.findActivos).toHaveBeenCalledTimes(1);
       expect(mockRepository.findActivosByLinea).not.toHaveBeenCalled();
     });
@@ -831,8 +837,13 @@ describe('ProductoService', () => {
       expect(resultado.excluidos[0].id).toBe(2);
       expect(resultado.excluidos[0].denominacion).toBe('Producto Barato');
       expect(resultado.excluidos[0].motivo).toBe('El precio final debe ser mayor que 0.');
-      // saveMany sólo recibe el producto válido
-      expect(mockRepository.saveMany).toHaveBeenCalledWith([productoValido]);
+      // saveMany sólo recibe el producto válido: el excluido (id 2) no llega
+      // ni al array ni al mapa de precios anteriores.
+      expect(mockRepository.saveMany).toHaveBeenCalledWith(
+        [productoValido],
+        new Map([[1, 1000]]),
+        dto,
+      );
     });
 
     // -------------------------------------------------------------------------

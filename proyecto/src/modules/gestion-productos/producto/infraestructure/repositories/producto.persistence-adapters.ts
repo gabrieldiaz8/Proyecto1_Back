@@ -16,6 +16,8 @@ import { Repository, IsNull, DataSource } from 'typeorm';
 import { Producto } from '../../domain/entities/producto.entity';
 import { IProductoRepository } from '../../domain/interfaces/producto.repository-interface';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
+import { ModalidadAjustePrecio } from '../../enums/ajuste-precio.enum';
 import { ProductoMapper } from '../../mappers/producto.mapper';
 import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
 import { IHistorialPrecioRepository } from 'src/modules/gestion-productos/historial-precio/domain/interfaces/historial-precio.repository.interface';
@@ -26,6 +28,14 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
   private readonly logger = new Logger(ProductoPersistenceAdapter.name);
 
   private readonly ENTITY_NAME = 'Producto';
+
+  /**
+   * Motivo por defecto para los cambios de precio que llegan por la edición
+   * general del producto (PUT /producto/:id). Ese flujo no recibe un motivo
+   * del cliente, pero historial_precio.motivo es NOT NULL.
+   */
+  private readonly MOTIVO_EDICION_GENERAL =
+    'Modificado desde edición general de producto';
 
   constructor(
     @InjectRepository(Producto)
@@ -42,13 +52,48 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
   async save(producto: Producto): Promise<Producto> {
     const repo = this.uow.getRepository(Producto);
     try {
-      return await repo.save(producto);
+      // En una edición la entidad llega ya mutada con el precio nuevo, así que
+      // el precio anterior hay que leerlo de la base. En un alta (sin id) no
+      // hay precio anterior con el que comparar y no se audita nada.
+      const precioAnterior = producto.id
+        ? await this.leerPrecioDeBase(repo, producto.id)
+        : null;
+
+      const entityGuardada = await repo.save(producto);
+
+      if (
+        precioAnterior !== null &&
+        precioAnterior !== entityGuardada.precio
+      ) {
+        await this.historialPrecioRepository.save(
+          this.uow,
+          entityGuardada.id,
+          precioAnterior,
+          entityGuardada.precio ?? 0,
+          this.MOTIVO_EDICION_GENERAL,
+        );
+      }
+
+      return entityGuardada;
     } catch (error) {
       throw new DatabaseConnectionException(
         'Error al guardar en la base de datos.',
       );
     }
   }
+
+  /** Lectura parcial: solo id y precio, sin relaciones ni joins. */
+  private async leerPrecioDeBase(
+    repo: Repository<Producto>,
+    id: number,
+  ): Promise<number | null> {
+    const actual = await repo.findOne({
+      where: { id },
+      select: { id: true, precio: true },
+    });
+    return actual?.precio ?? null;
+  }
+
   async findOne(id: number): Promise<Producto | null> {
     try {
       const entity = await this.repository
@@ -462,8 +507,53 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       .getMany();
   }
 
-  async saveMany(productos: Producto[]): Promise<Producto[]> {
-    return this.repository.save(productos);
+  /**
+   * Persistencia en lote del ajuste masivo de precios (CR-006).
+   *
+   * `preciosAnteriores` y `dto` son opcionales para no romper otros callers.
+   * Cuando se informan juntos, cada producto guardado cuyo precio difiera del
+   * valor previo queda registrado en historial_precio dentro de la misma
+   * transacción que el guardado del lote.
+   */
+  @Transactional()
+  async saveMany(
+    productos: Producto[],
+    preciosAnteriores?: Map<number, number>,
+    dto?: ActualizarPreciosMasivoDto,
+  ): Promise<Producto[]> {
+    const repo = this.uow.getRepository(Producto);
+    const guardados = await repo.save(productos);
+
+    if (!preciosAnteriores || !dto) {
+      return guardados;
+    }
+
+    const motivo = this.construirMotivoAjusteMasivo(dto);
+
+    for (const producto of guardados) {
+      const precioAnterior = preciosAnteriores.get(producto.id);
+
+      // Sin precio previo conocido no hay comparación posible: no se audita.
+      if (precioAnterior === undefined || precioAnterior === producto.precio) {
+        continue;
+      }
+
+      await this.historialPrecioRepository.save(
+        this.uow,
+        producto.id,
+        precioAnterior,
+        producto.precio ?? 0,
+        motivo,
+      );
+    }
+
+    return guardados;
+  }
+
+  private construirMotivoAjusteMasivo(dto: ActualizarPreciosMasivoDto): string {
+    const unidad =
+      dto.modalidad === ModalidadAjustePrecio.PORCENTAJE ? '%' : '';
+    return `Ajuste masivo — ${dto.tipoAjuste} ${dto.modalidad} ${dto.valor}${unidad}`;
   }
 
 

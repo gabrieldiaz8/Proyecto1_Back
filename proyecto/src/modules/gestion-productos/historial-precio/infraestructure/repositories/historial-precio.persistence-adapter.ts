@@ -22,7 +22,14 @@ export class HistorialPrecioPersistenceAdapter
     motivo: string,
   ): Promise<HistorialPrecio> {
     const repo = uow.getRepository(HistorialPrecio);
-    const registro = repo.create({ productoId, precioAnterior, precioNuevo, motivo });
+    // La FK se carga por la relación, no por una columna productoId: la tabla
+    // solo tiene producto_id.
+    const registro = repo.create({
+      producto: { id: productoId },
+      precioAnterior,
+      precioNuevo,
+      motivo,
+    });
     return repo.save(registro);
   }
 
@@ -32,7 +39,10 @@ export class HistorialPrecioPersistenceAdapter
     take: number,
   ): Promise<{ data: HistorialPrecio[]; total: number }> {
     const [data, total] = await this.repository.findAndCount({
-      where: { productoId },
+      where: { producto: { id: productoId } },
+      // Necesaria para que el mapper pueda leer producto.id y devolver el
+      // productoId del DTO.
+      relations: { producto: true },
       order: { fechaCambio: 'DESC' },
       skip,
       take,

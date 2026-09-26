@@ -2,9 +2,12 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { ConflictException, HttpException } from '@nestjs/common';
 import { ProductoPersistenceAdapter } from './producto.persistence-adapters';
 import { Producto } from '../../domain/entities/producto.entity';
 import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
+import { DatabaseConnectionException } from 'src/modules/common/exceptions/database-connection.exception';
+import { UnidadMedida } from '../../domain/enums/unidad-medida.enum';
 
 describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
   let adapter: ProductoPersistenceAdapter;
@@ -161,5 +164,244 @@ describe('ProductoPersistenceAdapter — findBy (CR-004)', () => {
     );
     expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
     expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+  });
+});
+
+// ===========================================================================
+// CR-005: cascada de denominaciones al renombrar Marca / Línea
+// ===========================================================================
+
+describe('ProductoPersistenceAdapter — cascada de denominaciones (CR-005)', () => {
+  let adapter: ProductoPersistenceAdapter;
+
+  const mockCascadaQueryBuilder = {
+    leftJoinAndSelect: jest.fn().mockReturnThis() as jest.Mock<any>,
+    where: jest.fn().mockReturnThis() as jest.Mock<any>,
+    andWhere: jest.fn().mockReturnThis() as jest.Mock<any>,
+    getMany: jest.fn() as jest.Mock<any>,
+  };
+
+  const mockRepository = {
+    createQueryBuilder: jest
+      .fn()
+      .mockReturnValue(mockCascadaQueryBuilder) as jest.Mock<any>,
+    save: jest.fn() as jest.Mock<any>,
+  };
+
+  const mockGeneradorDenominacion = {
+    generarDenominacion: jest.fn() as jest.Mock<any>,
+  };
+
+  let existsByDenominacionSpy: jest.SpiedFunction<
+    ProductoPersistenceAdapter['existsByDenominacion']
+  >;
+
+  const crearProducto = (
+    id: number,
+    denominacion: string,
+    relacion: { denominacion: string },
+    presentacion: { cantidad: number; unidad: UnidadMedida },
+  ): Producto => {
+    const producto = new Producto();
+    producto.id = id;
+    producto.denominacion = denominacion;
+    producto.denominacionManual = false;
+    producto.presentacionCantidad = presentacion.cantidad;
+    producto.presentacionUnidadMedida = presentacion.unidad;
+    return Object.assign(producto, relacion) as Producto;
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ProductoPersistenceAdapter,
+        { provide: getRepositoryToken(Producto), useValue: mockRepository },
+        { provide: DataSource, useValue: {} },
+        { provide: 'UnitOfWork', useValue: {} },
+        {
+          provide: GeneradorDenominacionService,
+          useValue: mockGeneradorDenominacion,
+        },
+        { provide: 'IHistorialPrecioRepository', useValue: {} },
+      ],
+    }).compile();
+
+    adapter = module.get<ProductoPersistenceAdapter>(ProductoPersistenceAdapter);
+    jest.clearAllMocks();
+    mockRepository.createQueryBuilder.mockReturnValue(mockCascadaQueryBuilder);
+    mockGeneradorDenominacion.generarDenominacion.mockImplementation(
+      (marca: string, linea: string, presentacion?: string) =>
+        [marca, linea, presentacion].filter(Boolean).join(' ').toUpperCase(),
+    );
+    existsByDenominacionSpy = jest
+      .spyOn(adapter, 'existsByDenominacion')
+      .mockResolvedValue(false);
+  });
+
+  // =========================================================================
+  // regresión del bug 409 -> 500
+  // =========================================================================
+
+  it('debería responder 409 y no 500 cuando la cascada por Marca colisiona dentro del mismo lote', async () => {
+    const linea = { denominacion: 'Mermeladas' };
+    mockCascadaQueryBuilder.getMany.mockResolvedValue([
+      crearProducto(1, 'VIEJA 1', linea, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+      crearProducto(2, 'VIEJA 2', linea, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+    ]);
+    // Ambas regeneran a la misma denominación => colisión intra-lote.
+    mockGeneradorDenominacion.generarDenominacion.mockReturnValue(
+      'ARCOR MERMELADAS 500 ML',
+    );
+
+    const error = await adapter
+      .regenerarDenominacionesPorMarca(1, 'Arcor')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error).not.toBeInstanceOf(DatabaseConnectionException);
+    expect((error as HttpException).getStatus()).toBe(409);
+    expect(mockRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('debería responder 409 y no 500 cuando la cascada por Marca colisiona contra un producto ya guardado en la BD', async () => {
+    mockCascadaQueryBuilder.getMany.mockResolvedValue([
+      crearProducto(1, 'VIEJA 1', { denominacion: 'Mermeladas' }, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+    ]);
+    existsByDenominacionSpy.mockResolvedValue(true);
+
+    const error = await adapter
+      .regenerarDenominacionesPorMarca(1, 'Arcor')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error).not.toBeInstanceOf(DatabaseConnectionException);
+    expect((error as HttpException).getStatus()).toBe(409);
+    expect(mockRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('debería responder 409 y no 500 cuando la cascada por Línea colisiona dentro del mismo lote', async () => {
+    const marca = { denominacion: 'Arcor' };
+    mockCascadaQueryBuilder.getMany.mockResolvedValue([
+      crearProducto(1, 'VIEJA 1', marca, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+      crearProducto(2, 'VIEJA 2', marca, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+    ]);
+    mockGeneradorDenominacion.generarDenominacion.mockReturnValue(
+      'ARCOR MERMELADAS 500 ML',
+    );
+
+    const error = await adapter
+      .regenerarDenominacionesPorLinea(1, 'Mermeladas')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error).not.toBeInstanceOf(DatabaseConnectionException);
+    expect((error as HttpException).getStatus()).toBe(409);
+    expect(mockRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('debería responder 409 y no 500 cuando la cascada por Línea colisiona contra un producto ya guardado en la BD', async () => {
+    mockCascadaQueryBuilder.getMany.mockResolvedValue([
+      crearProducto(1, 'VIEJA 1', { denominacion: 'Arcor' }, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+    ]);
+    existsByDenominacionSpy.mockResolvedValue(true);
+
+    const error = await adapter
+      .regenerarDenominacionesPorLinea(1, 'Mermeladas')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error).not.toBeInstanceOf(DatabaseConnectionException);
+    expect((error as HttpException).getStatus()).toBe(409);
+    expect(mockRepository.save).not.toHaveBeenCalled();
+  });
+
+  // =========================================================================
+  // el re-throw no debe tapar errores genuinos de base de datos
+  // =========================================================================
+
+  it('debería seguir envolviendo en DatabaseConnectionException los errores que no son HttpException (cascade por Marca)', async () => {
+    mockCascadaQueryBuilder.getMany.mockRejectedValue(
+      new Error('ECONNREFUSED 127.0.0.1:3310'),
+    );
+
+    const error = await adapter
+      .regenerarDenominacionesPorMarca(1, 'Arcor')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(DatabaseConnectionException);
+    expect((error as HttpException).getStatus()).toBe(500);
+  });
+
+  it('debería seguir envolviendo en DatabaseConnectionException los errores que no son HttpException (cascade por Línea)', async () => {
+    mockCascadaQueryBuilder.getMany.mockRejectedValue(
+      new Error('ECONNREFUSED 127.0.0.1:3310'),
+    );
+
+    const error = await adapter
+      .regenerarDenominacionesPorLinea(1, 'Mermeladas')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(DatabaseConnectionException);
+    expect((error as HttpException).getStatus()).toBe(500);
+  });
+
+  // =========================================================================
+  // camino feliz: la cascada no debe seguir filtrando NotFound en 500
+  // =========================================================================
+
+  it('debería regenerar y persistir todas las denominaciones cuando no hay colisión', async () => {
+    mockCascadaQueryBuilder.getMany.mockResolvedValue([
+      crearProducto(1, 'VIEJA 1', { denominacion: 'Mermeladas' }, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+      crearProducto(2, 'VIEJA 2', { denominacion: 'Mermeladas' }, {
+        cantidad: 1000,
+        unidad: UnidadMedida.ML,
+      }),
+    ]);
+    mockRepository.save.mockResolvedValue([]);
+
+    const total = await adapter.regenerarDenominacionesPorMarca(1, 'Arcor');
+
+    expect(total).toBe(2);
+    expect(mockRepository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('debería propagar el NotFoundException (404) del generador sin convertirlo en 500', async () => {
+    mockCascadaQueryBuilder.getMany.mockResolvedValue([
+      crearProducto(1, 'VIEJA 1', { denominacion: 'Mermeladas' }, {
+        cantidad: 500,
+        unidad: UnidadMedida.ML,
+      }),
+    ]);
+    mockGeneradorDenominacion.generarDenominacion.mockImplementation(() => {
+      throw new (require('@nestjs/common').NotFoundException)('sin marca');
+    });
+
+    const error = await adapter
+      .regenerarDenominacionesPorMarca(1, 'Arcor')
+      .catch((e: unknown) => e);
+
+    expect((error as HttpException).getStatus()).toBe(404);
+    expect(error).not.toBeInstanceOf(DatabaseConnectionException);
   });
 });

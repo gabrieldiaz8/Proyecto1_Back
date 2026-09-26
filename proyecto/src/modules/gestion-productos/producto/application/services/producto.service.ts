@@ -628,9 +628,16 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
     // 3. Procesamiento tolerante a fallos
     const productosAActualizar: Producto[] = [];
     const excluidos: ResultadoActualizacionMasiva['excluidos'] = [];
+    // Precio previo por producto, capturado antes de aplicar el ajuste, para
+    // que el adapter pueda dejar registro en historial_precio.
+    const preciosAnteriores = new Map<number, number>();
 
     for (const producto of productos) {
       try {
+        // Se lee antes de mutar: en este punto la entidad todavía tiene el
+        // precio que tiene en la base.
+        const precioAnterior = producto.precio ?? 0;
+
         if (
           dto.tipoAjuste === TipoAjustePrecio.AUMENTO &&
           dto.modalidad === ModalidadAjustePrecio.MONTO
@@ -657,6 +664,9 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
           );
         }
 
+        // Sólo se anota el precio previo de los productos que pasaron el ajuste:
+        // los excluidos no llegan a persistirse ni generan historial.
+        preciosAnteriores.set(producto.id, precioAnterior);
         productosAActualizar.push(producto);
       } catch (error: unknown) {
         const motivo =
@@ -674,7 +684,11 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
 
     // 4. Persistencia en lote de los exitosos
     if (productosAActualizar.length > 0) {
-      await this.repository.saveMany(productosAActualizar);
+      await this.repository.saveMany(
+        productosAActualizar,
+        preciosAnteriores,
+        dto,
+      );
     }
 
     this.logger.log(

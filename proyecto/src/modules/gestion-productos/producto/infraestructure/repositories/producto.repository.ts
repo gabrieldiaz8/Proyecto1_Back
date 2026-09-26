@@ -5,6 +5,7 @@ import { ProductoPersistenceAdapter } from './producto.persistence-adapters';
 import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 
 @Injectable()
 export class ProductoRepository implements IProductoRepository {
@@ -166,8 +167,12 @@ export class ProductoRepository implements IProductoRepository {
     return this.persistenceService.findActivosByLinea(lineaId);
   }
 
-  async saveMany(productos: Producto[]): Promise<Producto[]> {
-    return this.persistenceService.saveMany(productos);
+  async saveMany(
+    productos: Producto[],
+    preciosAnteriores?: Map<number, number>,
+    dto?: ActualizarPreciosMasivoDto,
+  ): Promise<Producto[]> {
+    return this.persistenceService.saveMany(productos, preciosAnteriores, dto);
   }
 
 }

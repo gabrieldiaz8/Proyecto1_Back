@@ -2,6 +2,7 @@ import { Producto } from '../entities/producto.entity';
 import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 
 export interface IProductoRepository {
 
@@ -81,6 +82,17 @@ export interface IProductoRepository {
   /** Devuelve los productos activos filtrados por lineaId. */
   findActivosByLinea(lineaId: number): Promise<Producto[]>;
 
-  /** Persiste masivamente un array de entidades Producto. */
-  saveMany(productos: Producto[]): Promise<Producto[]>;
+  /**
+   * Persiste masivamente un array de entidades Producto.
+   *
+   * @param preciosAnteriores Precio previo por id, capturado antes de mutar las
+   * entidades. Junto con `dto` habilita el registro en historial_precio de los
+   * productos cuyo precio haya cambiado.
+   * @param dto DTO original del ajuste masivo, usado para armar el motivo.
+   */
+  saveMany(
+    productos: Producto[],
+    preciosAnteriores?: Map<number, number>,
+    dto?: ActualizarPreciosMasivoDto,
+  ): Promise<Producto[]>;
 }

@@ -9,7 +9,9 @@ export class HistorialPrecioMapper {
       precioNuevo: entity.precioNuevo,
       motivo: entity.motivo,
       fechaCambio: entity.fechaCambio,
-      productoId: entity.productoId,
+      // La entidad ya no expone productoId: sale de la relación, que el
+      // repositorio carga en findByProducto.
+      productoId: entity.producto?.id,
     };
   }
 }

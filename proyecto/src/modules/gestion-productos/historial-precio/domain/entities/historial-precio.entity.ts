@@ -5,7 +5,6 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
-  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { MonetarioColumn } from 'src/modules/common/decorators/monetario-column.decorator';
@@ -33,13 +32,13 @@ export class HistorialPrecio {
   @CreateDateColumn()
   fechaCambio: Date;
 
-  // FK a Producto — sin cascada, el historial sobrevive al soft-delete del producto
+  // FK a Producto — sin cascada, el historial sobrevive al soft-delete del
+  // producto. La relación es la única declaración de la FK: la columna real
+  // es producto_id (migración CreateHistorialPrecio). Antes se declaraba
+  // además una columna "productoId", que no existe en la tabla, y TypeORM
+  // fallaba con "Unknown column 'HistorialPrecio.productoId'" en toda
+  // lectura o escritura sobre esta entidad.
   @ManyToOne(() => Producto, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'producto_id' })
   producto: Producto;
-
-  @ApiProperty()
-  @Index()
-  @Column({ type: 'int' })
-  productoId: number;
 }

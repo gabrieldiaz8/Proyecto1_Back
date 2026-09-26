@@ -41,6 +41,18 @@ describe('Presentacion (Value Object) — CR-002', () => {
         BadRequestException,
       );
     });
+
+    it('debería lanzar BadRequestException si presentacionCantidad es Infinity', () => {
+      expect(() => new Presentacion(Infinity, UnidadMedida.L)).toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('debería lanzar BadRequestException si presentacionCantidad es -Infinity', () => {
+      expect(() => new Presentacion(-Infinity, UnidadMedida.L)).toThrow(
+        BadRequestException,
+      );
+    });
   });
 
   describe('CP-CR002-B-03: unidad de medida vacía', () => {

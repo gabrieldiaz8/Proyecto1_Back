@@ -32,7 +32,7 @@ export class Presentacion {
   private validarCantidad(cantidad: number): void {
     if (
       typeof cantidad !== 'number' ||
-      Number.isNaN(cantidad) ||
+      !Number.isFinite(cantidad) ||
       cantidad <= 0
     ) {
       throw new BadRequestException(

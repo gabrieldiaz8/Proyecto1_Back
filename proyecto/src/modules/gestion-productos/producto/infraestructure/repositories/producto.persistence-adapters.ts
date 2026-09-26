@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  HttpException,
   Inject,
   Injectable,
   Logger,
@@ -489,6 +490,14 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     }
   }
 
+  // TODO(CR-005): la cascada de denominaciones NO es atómica con el renombre de
+  // Marca/Línea que la dispara. Si el rename de la Marca se confirma y esta
+  // regeneración falla (o viceversa), queda la marca cambiada con denominaciones
+  // viejas, o al revés. Cerrarlo requiere una transacción compartida entre la
+  // Marca/Línea y este adapter, es decir un refactor mayor del
+  // @Transactional()/IUnitOfWork (hoy el save de productos usa this.repository,
+  // fuera del UoW). Fuera del alcance de este CR: queda pendiente para el
+  // refactor de Transactional/UoW.
   async regenerarDenominacionesPorMarca(
     marcaId: number,
     nuevaDenominacion: string,
@@ -539,6 +548,9 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       );
       return productos.length;
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       this.logger.error(
         `Error regenerando denominaciones por Marca ${marcaId}:`,
         error,
@@ -599,6 +611,9 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       );
       return productos.length;
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       this.logger.error(
         `Error regenerando denominaciones por Línea ${lineaId}:`,
         error,

@@ -518,6 +518,18 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
         !denominacionManual;
 
       if (cambianComponentes || reverteAAutomatico) {
+        // TODO: confirmar con el equipo si bloquear es el comportamiento correcto
+        //  o si debería ser un warning (CR-005 Criterio 4).
+        // Sin presentación no se puede componer la denominación automática: hoy
+        // se generaba silenciosamente sin el sufijo de presentación
+        // (p. ej. "ARCOR MERMELADAS" en lugar de "ARCOR MERMELADAS 500 ML"),
+        // lo que además puede colisionar con otro producto.
+        if (presentacionCantidad == null || presentacionUnidadMedida == null) {
+          throw new BadRequestException(
+            'La presentación es obligatoria para generar la denominación automática: debe enviar presentacionCantidad y presentacionUnidadMedida',
+          );
+        }
+
         denominacion = this.generadorDenominacionService.generarDenominacion(
           marca.denominacion,
           linea.denominacion,

@@ -14,6 +14,7 @@ import {
 } from '../../enums/ajuste-precio.enum';
 import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
+import { UnidadMedida } from '../../domain/enums/unidad-medida.enum';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -293,7 +294,7 @@ describe('ProductoService', () => {
       expect(mockGeneradorDenominacionService.generarDenominacion).toHaveBeenCalledWith(
         'Arcor',
         'Mermeladas',
-        undefined,
+        '500 ML',
       );
       expect(mockRepository.save).toHaveBeenCalledTimes(1);
     });
@@ -400,7 +401,7 @@ describe('ProductoService', () => {
       expect(mockGeneradorDenominacionService.generarDenominacion).toHaveBeenCalledWith(
         '',
         '',
-        undefined,
+        '500 ML',
       );
       expect(mockRepository.save).not.toHaveBeenCalled();
     });
@@ -440,6 +441,13 @@ describe('ProductoService', () => {
       Object.assign(dto, overrides);
 
       mockRepository.findOne.mockResolvedValue(productoActual);
+      // Presentación por defecto: los casos de CR-005 de esta sección no
+      // verifican la presentación (hay un caso dedicado más abajo), pero sin
+      // ella la regeneración de la denominación automática queda bloqueada
+      // por el BadRequestException de Criterio 4.
+      if (productoActual.presentacionCantidad === undefined) {
+        productoActual.setPresentacion(500, UnidadMedida.ML);
+      }
       mockRelatedEntitiesValidator.validarYObtenerEntidadesRelacionadas = jest
         .fn()
         .mockResolvedValue({
@@ -509,7 +517,7 @@ describe('ProductoService', () => {
 
       expect(
         mockGeneradorDenominacionService.generarDenominacion,
-      ).toHaveBeenCalledWith('Marca Nueva', 'Línea Nueva', undefined);
+      ).toHaveBeenCalledWith('Marca Nueva', 'Línea Nueva', '500 ML');
       expect(productoActual.denominacion).toBe('MARCA NUEVA LINEA NUEVA');
       expect(productoActual.denominacionManual).toBe(false);
     });
@@ -552,7 +560,7 @@ describe('ProductoService', () => {
       expect(mockGeneradorDenominacionService.generarDenominacion).toHaveBeenCalledWith(
         'Marca B',
         'Línea B',
-        undefined,
+        '500 ML',
       );
       expect(productoActual.denominacion).toBe('MARCA B LINEA B');
       expect(productoActual.denominacionManual).toBe(false);
@@ -649,6 +657,120 @@ describe('ProductoService', () => {
         'La denominación es obligatoria',
       );
       expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    // =========================================================================
+    // CR-005 Criterio 4: presentación faltante al generar la denominación
+    // automática. Sin presentación no se puede componer la denominación, antes
+    // se generaba silenciosamente sin el sufijo de presentación.
+    // =========================================================================
+
+    function crearProductoSinPresentacion(marcaId = 1, lineaId = 1): Producto {
+      const productoActual = new Producto();
+      productoActual.id = 7;
+      productoActual.denominacion = 'MARCA A LINEA A';
+      productoActual.denominacionManual = false;
+      productoActual.marcaId = marcaId;
+      productoActual.lineaId = lineaId;
+      productoActual.presentacionCantidad = null;
+      productoActual.presentacionUnidadMedida = null;
+      return productoActual;
+    }
+
+    it('debería lanzar BadRequestException al regenerar la denominación automática si el producto no tiene presentación (Criterio 4)', async () => {
+      const productoActual = crearProductoSinPresentacion();
+
+      const dto = prepararUpdate(productoActual, { marcaId: 9, lineaId: 5 });
+
+      await expect(service.update(7, dto)).rejects.toThrow(BadRequestException);
+      await expect(service.update(7, dto)).rejects.toThrow(
+        'La presentación es obligatoria para generar la denominación automática',
+      );
+      expect(
+        mockGeneradorDenominacionService.generarDenominacion,
+      ).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar BadRequestException al revertir a automática si el producto no tiene presentación (Criterio 4)', async () => {
+      const productoActual = crearProductoSinPresentacion();
+      productoActual.denominacionManual = true;
+      productoActual.denominacion = 'ETIQUETA MANUAL';
+
+      const dto = prepararUpdate(productoActual, { denominacion: '' });
+
+      await expect(service.update(7, dto)).rejects.toThrow(BadRequestException);
+      expect(
+        mockGeneradorDenominacionService.generarDenominacion,
+      ).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar BadRequestException si se envía sólo una mitad del par de presentación al regenerar (Criterio 4)', async () => {
+      const productoActual = crearProductoSinPresentacion();
+
+      const dto = prepararUpdate(productoActual, {
+        marcaId: 9,
+        lineaId: 5,
+        presentacionCantidad: 500,
+        presentacionUnidadMedida: null,
+      });
+
+      await expect(service.update(7, dto)).rejects.toThrow(BadRequestException);
+      expect(
+        mockGeneradorDenominacionService.generarDenominacion,
+      ).not.toHaveBeenCalled();
+      expect(mockRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('debería permitir regenerar si la presentación viene completa en el DTO (Criterio 4)', async () => {
+      const productoActual = crearProductoSinPresentacion();
+
+      const dto = prepararUpdate(productoActual, {
+        marcaId: 9,
+        lineaId: 5,
+        presentacionCantidad: 1000,
+        presentacionUnidadMedida: UnidadMedida.G,
+      });
+
+      mockGeneradorDenominacionService.generarDenominacion.mockReturnValue(
+        'MARCA B LINEA B 1000 G',
+      );
+
+      await service.update(7, dto);
+
+      expect(
+        mockGeneradorDenominacionService.generarDenominacion,
+      ).toHaveBeenCalledWith('Marca B', 'Línea B', '1000 G');
+      expect(productoActual.denominacion).toBe('MARCA B LINEA B 1000 G');
+    });
+
+    it('debería_NO lanzar BadRequestException si la denominación es manual aunque falte la presentación (Criterio 4)', async () => {
+      const productoActual = crearProductoSinPresentacion();
+
+      const dto = prepararUpdate(productoActual, {
+        denominacion: 'MI ETIQUETA',
+      });
+
+      await service.update(7, dto);
+
+      expect(
+        mockGeneradorDenominacionService.generarDenominacion,
+      ).not.toHaveBeenCalled();
+      expect(productoActual.denominacion).toBe('MI ETIQUETA');
+    });
+
+    it('debería_NO lanzar BadRequestException si no cambian los componentes de la denominación automática (Criterio 4)', async () => {
+      const productoActual = crearProductoSinPresentacion();
+
+      const dto = prepararUpdate(productoActual, { observacion: 'sin efecto' });
+
+      await service.update(7, dto);
+
+      expect(
+        mockGeneradorDenominacionService.generarDenominacion,
+      ).not.toHaveBeenCalled();
+      expect(productoActual.denominacion).toBe('MARCA A LINEA A');
     });
   });
 

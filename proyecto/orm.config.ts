@@ -1,10 +1,9 @@
-import {config} from 'dotenv';
+import { config } from 'dotenv';
 import { DataSource } from 'typeorm';
-
 
 config({
   path: `.env`,
-  override: true,
+  // sin override: true — así las env vars de Render tienen prioridad
 });
 
 export default new DataSource({
@@ -14,6 +13,10 @@ export default new DataSource({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
+
+  ssl: {
+    rejectUnauthorized: false,
+  },
 
   entities: [__dirname + '/src/**/*.entity.ts'],
   migrations: [__dirname + '/src/migrations/*{.ts,.js}'],

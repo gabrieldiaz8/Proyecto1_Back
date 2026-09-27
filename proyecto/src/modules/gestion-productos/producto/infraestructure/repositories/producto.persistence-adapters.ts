@@ -1,19 +1,26 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transactional } from 'src/modules/common/decorators/transactional.decoratos';
 import { DatabaseConnectionException } from 'src/modules/common/exceptions/database-connection.exception';
 import { EntityNotFoundException } from 'src/modules/common/exceptions/entity-notFound-exceptions';
 import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
-import { Linea } from 'src/modules/gestion-productos/linea/domain/entities/linea.entity';
-import { Marca } from 'src/modules/gestion-productos/marca/domain/entities/marca.entity';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { Repository, IsNull, DataSource } from 'typeorm';
 import { Producto } from '../../domain/entities/producto.entity';
 import { IProductoRepository } from '../../domain/interfaces/producto.repository-interface';
-import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
-import { UpdateProductoDto } from '../../dto/update-producto.dto';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
+import { ModalidadAjustePrecio } from '../../enums/ajuste-precio.enum';
 import { ProductoMapper } from '../../mappers/producto.mapper';
+import { GeneradorDenominacionService } from '../../domain/services/generador-denominacion.service';
+import { IHistorialPrecioRepository } from 'src/modules/gestion-productos/historial-precio/domain/interfaces/historial-precio.repository.interface';
 
 
 @Injectable()
@@ -22,58 +29,71 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
 
   private readonly ENTITY_NAME = 'Producto';
 
+  /**
+   * Motivo por defecto para los cambios de precio que llegan por la edición
+   * general del producto (PUT /producto/:id). Ese flujo no recibe un motivo
+   * del cliente, pero historial_precio.motivo es NOT NULL.
+   */
+  private readonly MOTIVO_EDICION_GENERAL =
+    'Modificado desde edición general de producto';
+
   constructor(
     @InjectRepository(Producto)
     private readonly repository: Repository<Producto>,
     private readonly dataSource: DataSource,
     @Inject('UnitOfWork') public readonly uow: IUnitOfWork,
+    private readonly generadorDenominacionService: GeneradorDenominacionService,
+    @Inject('IHistorialPrecioRepository')
+    private readonly historialPrecioRepository: IHistorialPrecioRepository,
   ) { }
 
 
   @Transactional()
-  async create(
-    data: CreateProductoDto,
-    linea: Linea,
-    marca: Marca,
-    usuario: Usuario,
-  ): Promise<Producto> {
+  async save(producto: Producto): Promise<Producto> {
     const repo = this.uow.getRepository(Producto);
-    this.logger.log(`Creando un nuevo p ${this.ENTITY_NAME}`);
-
     try {
-      // DEBUG: Loggear todos los datos que llegan
-      this.logger.debug('Data recibida:', JSON.stringify(data, null, 2));
-      // Verificar que todos los objetos relacionados existan
-      this.logger.debug('Linea:', linea);
-      this.logger.debug('Marca:', marca);
-      this.logger.debug('Usuario:', usuario);
+      // En una edición la entidad llega ya mutada con el precio nuevo, así que
+      // el precio anterior hay que leerlo de la base. En un alta (sin id) no
+      // hay precio anterior con el que comparar y no se audita nada.
+      const precioAnterior = producto.id
+        ? await this.leerPrecioDeBase(repo, producto.id)
+        : null;
 
-      const nuevaEntity = repo.create({
-        ...data,
-        linea,
-        marca,
-        usuarioCreated: usuario,
-      });
+      const entityGuardada = await repo.save(producto);
 
-      this.logger.debug('Entity creada:', nuevaEntity);
-
-      const entityGuardada = await repo.save(nuevaEntity);
-      this.logger.log(`Entity guardada con ID: ${entityGuardada.id}`);
-
-      this.logger.log(
-        `${this.ENTITY_NAME} creado exitosamente con ID: ${entityGuardada.id}`,
-      );
-
+      if (
+        precioAnterior !== null &&
+        precioAnterior !== entityGuardada.precio
+      ) {
+        await this.historialPrecioRepository.save(
+          this.uow,
+          entityGuardada.id,
+          precioAnterior,
+          entityGuardada.precio ?? 0,
+          this.MOTIVO_EDICION_GENERAL,
+        );
+      }
 
       return entityGuardada;
     } catch (error) {
-      this.logger.error(`Error al crear ${this.ENTITY_NAME}:`, error);
-      this.logger.error('Stack trace:', error);
       throw new DatabaseConnectionException(
         'Error al guardar en la base de datos.',
       );
     }
   }
+
+  /** Lectura parcial: solo id y precio, sin relaciones ni joins. */
+  private async leerPrecioDeBase(
+    repo: Repository<Producto>,
+    id: number,
+  ): Promise<number | null> {
+    const actual = await repo.findOne({
+      where: { id },
+      select: { id: true, precio: true },
+    });
+    return actual?.precio ?? null;
+  }
+
   async findOne(id: number): Promise<Producto | null> {
     try {
       const entity = await this.repository
@@ -154,45 +174,6 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     }
   }
 
-  @Transactional()
-  async update(
-    id: number,
-    data: UpdateProductoDto,
-    linea: Linea,
-    marca: Marca,
-
-    usuario: Usuario,
-  ): Promise<Producto> {
-    const repo = this.uow.getRepository(Producto);
-    try {
-      const entity = await this.findOne(id);
-
-      if (!entity) {
-        throw new NotFoundException(`EL prodcuto con ID ${id} no encontrada`);
-      }
-      const {
-
-        ...dataSinItems
-      } = data;
-
-      Object.assign(entity, dataSinItems, {
-        linea,
-        marca,
-      });
-
-      entity.usuarioUpdated = usuario; 
-      const entityActualizada = await repo.save(entity);
-
-
-      return entityActualizada;
-    } catch (error) {
-      this.logger.warn(`Items para eliminar: )}`);
-
-      throw new DatabaseConnectionException(error);
-    }
-  }
-
-
   async updateEntity(uow: IUnitOfWork, producto: Producto): Promise<Producto> {
     const repo = uow.getRepository(Producto);
     return await repo.save(producto);
@@ -223,16 +204,18 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     codigoReferencia: string,
     marca_id: number,
     linea_id: number,
-    proveedor_id: number,
     conStock: boolean,
     skip: number,
     take: number,
+    lineaDenominacion?: string,
+    superLineaDenominacion?: string,
   ): Promise<{ data: Producto[]; total: number }> {
     this.logger.warn(`llega`);
     const query = this.repository
       .createQueryBuilder('producto')
       .leftJoinAndSelect('producto.marca', 'marca')
       .leftJoinAndSelect('producto.linea', 'linea')
+      .leftJoinAndSelect('linea.superLinea', 'superLinea');
 
     if (denominacion || codigoProveedor || codigoReferencia) {
       const condiciones: string[] = [];
@@ -274,6 +257,16 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     }
     if (linea_id) {
       query.andWhere('linea.id = :linea_id', { linea_id });
+    }
+    if (lineaDenominacion) {
+      query.andWhere('UPPER(linea.denominacion) LIKE UPPER(:lineaDenominacion)',
+        { lineaDenominacion: `%${lineaDenominacion}%` },
+      );
+    }
+    if (superLineaDenominacion) {
+      query.andWhere('UPPER(superLinea.denominacion) LIKE UPPER(:superLineaDenominacion)',
+        { superLineaDenominacion: `%${superLineaDenominacion}%` },
+      );
     }
 
     this.logger.warn(`conStock llega como: ${conStock} (${typeof conStock})`);
@@ -378,10 +371,23 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       throw new NotFoundException('Producto no encontrado');
     }
 
+    const precioAnterior = entity.precio;
+
+    entity.cambiarPrecio(dto.precio);
+
     ProductoMapper.mapPrecios(entity, dto, usuario);
 
     await repo.save(entity);
 
+    if (entity.precio !== precioAnterior) {
+      await this.historialPrecioRepository.save(
+        this.uow,
+        id,
+        precioAnterior ?? 0,
+        entity.precio ?? 0,
+        dto.motivo,
+      );
+    }
   }
 
   async findByDenominacion(denominacion: string): Promise<Producto | null> {
@@ -486,6 +492,70 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
       .getMany();
   }
 
+  async findActivos(): Promise<Producto[]> {
+    return this.repository
+      .createQueryBuilder('producto')
+      .where('producto.deletedAt IS NULL')
+      .getMany();
+  }
+
+  async findActivosByLinea(lineaId: number): Promise<Producto[]> {
+    return this.repository
+      .createQueryBuilder('producto')
+      .where('producto.linea_id = :lineaId', { lineaId })
+      .andWhere('producto.deletedAt IS NULL')
+      .getMany();
+  }
+
+  /**
+   * Persistencia en lote del ajuste masivo de precios (CR-006).
+   *
+   * `preciosAnteriores` y `dto` son opcionales para no romper otros callers.
+   * Cuando se informan juntos, cada producto guardado cuyo precio difiera del
+   * valor previo queda registrado en historial_precio dentro de la misma
+   * transacción que el guardado del lote.
+   */
+  @Transactional()
+  async saveMany(
+    productos: Producto[],
+    preciosAnteriores?: Map<number, number>,
+    dto?: ActualizarPreciosMasivoDto,
+  ): Promise<Producto[]> {
+    const repo = this.uow.getRepository(Producto);
+    const guardados = await repo.save(productos);
+
+    if (!preciosAnteriores || !dto) {
+      return guardados;
+    }
+
+    const motivo = this.construirMotivoAjusteMasivo(dto);
+
+    for (const producto of guardados) {
+      const precioAnterior = preciosAnteriores.get(producto.id);
+
+      // Sin precio previo conocido no hay comparación posible: no se audita.
+      if (precioAnterior === undefined || precioAnterior === producto.precio) {
+        continue;
+      }
+
+      await this.historialPrecioRepository.save(
+        this.uow,
+        producto.id,
+        precioAnterior,
+        producto.precio ?? 0,
+        motivo,
+      );
+    }
+
+    return guardados;
+  }
+
+  private construirMotivoAjusteMasivo(dto: ActualizarPreciosMasivoDto): string {
+    const unidad =
+      dto.modalidad === ModalidadAjustePrecio.PORCENTAJE ? '%' : '';
+    return `Ajuste masivo — ${dto.tipoAjuste} ${dto.modalidad} ${dto.valor}${unidad}`;
+  }
+
 
   async existsByCodigoProveedor(codigoProveedor: string, excludeId: number): Promise<boolean> {
     try {
@@ -503,6 +573,140 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
     } catch (error) {
       this.logger.error(
         `Error verificando existencia de denominación:}`,
+      );
+      throw new DatabaseConnectionException(
+        'Error al conectar con la base de datos.',
+      );
+    }
+  }
+
+  // TODO(CR-005): la cascada de denominaciones NO es atómica con el renombre de
+  // Marca/Línea que la dispara. Si el rename de la Marca se confirma y esta
+  // regeneración falla (o viceversa), queda la marca cambiada con denominaciones
+  // viejas, o al revés. Cerrarlo requiere una transacción compartida entre la
+  // Marca/Línea y este adapter, es decir un refactor mayor del
+  // @Transactional()/IUnitOfWork (hoy el save de productos usa this.repository,
+  // fuera del UoW). Fuera del alcance de este CR: queda pendiente para el
+  // refactor de Transactional/UoW.
+  async regenerarDenominacionesPorMarca(
+    marcaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    try {
+      const productos = await this.repository
+        .createQueryBuilder('producto')
+        .leftJoinAndSelect('producto.linea', 'linea')
+        .where('producto.marca_id = :marcaId', { marcaId })
+        .andWhere('producto.denominacionManual = :manual', { manual: false })
+        .andWhere('producto.deletedAt IS NULL')
+        .getMany();
+
+      const denominacionesGeneradas = new Set<string>();
+
+      for (const producto of productos) {
+        const denominacionGenerada =
+          this.generadorDenominacionService.generarDenominacion(
+            nuevaDenominacion,
+            producto.linea?.denominacion ?? '',
+            producto.getPresentacionDescripcion() ?? undefined,
+          );
+
+        if (denominacionesGeneradas.has(denominacionGenerada)) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" colisiona con otro producto regenerado en el mismo lote.`,
+          );
+        }
+
+        if (
+          await this.existsByDenominacion(denominacionGenerada, producto.id)
+        ) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" generada colisiona con un producto existente.`,
+          );
+        }
+
+        denominacionesGeneradas.add(denominacionGenerada);
+        producto.denominacion = denominacionGenerada;
+      }
+
+      if (productos.length > 0) {
+        await this.repository.save(productos);
+      }
+
+      this.logger.log(
+        `[${this.ENTITY_NAME}] Denominaciones regeneradas por Marca ${marcaId}: ${productos.length}`,
+      );
+      return productos.length;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error regenerando denominaciones por Marca ${marcaId}:`,
+        error,
+      );
+      throw new DatabaseConnectionException(
+        'Error al conectar con la base de datos.',
+      );
+    }
+  }
+
+  async regenerarDenominacionesPorLinea(
+    lineaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    try {
+      const productos = await this.repository
+        .createQueryBuilder('producto')
+        .leftJoinAndSelect('producto.marca', 'marca')
+        .where('producto.linea_id = :lineaId', { lineaId })
+        .andWhere('producto.denominacionManual = :manual', { manual: false })
+        .andWhere('producto.deletedAt IS NULL')
+        .getMany();
+
+      const denominacionesGeneradas = new Set<string>();
+
+      for (const producto of productos) {
+        const denominacionGenerada =
+          this.generadorDenominacionService.generarDenominacion(
+            producto.marca?.denominacion ?? '',
+            nuevaDenominacion,
+            producto.getPresentacionDescripcion() ?? undefined,
+          );
+
+        if (denominacionesGeneradas.has(denominacionGenerada)) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" colisiona con otro producto regenerado en el mismo lote.`,
+          );
+        }
+
+        if (
+          await this.existsByDenominacion(denominacionGenerada, producto.id)
+        ) {
+          throw new ConflictException(
+            `[${this.ENTITY_NAME}] La denominación "${denominacionGenerada}" generada colisiona con un producto existente.`,
+          );
+        }
+
+        denominacionesGeneradas.add(denominacionGenerada);
+        producto.denominacion = denominacionGenerada;
+      }
+
+      if (productos.length > 0) {
+        await this.repository.save(productos);
+      }
+
+      this.logger.log(
+        `[${this.ENTITY_NAME}] Denominaciones regeneradas por Línea ${lineaId}: ${productos.length}`,
+      );
+      return productos.length;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(
+        `Error regenerando denominaciones por Línea ${lineaId}:`,
+        error,
       );
       throw new DatabaseConnectionException(
         'Error al conectar con la base de datos.',

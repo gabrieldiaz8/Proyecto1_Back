@@ -186,7 +186,10 @@ Base URL (Render): `https://proyecto1-back-xtni.onrender.com`
 ```
 
 > **Queries:**
-> - `search-by` → `?denominacion=&codigoProveedor=&codProveedorExacto=&codigoReferencia=&marcaId=&lineaId=&proveedorId=&conStock=&skip=&take=`
+> - `search-by` → `?denominacion=&codigoProveedor=&codProveedorExacto=&codigoReferencia=&marcaId=&lineaId=&proveedorId=&conStock=&skip=&take=&lineaDenominacion=&superLineaDenominacion=`
+>   - `lineaDenominacion` — texto parcial, insensible a mayúsculas, sobre `linea.denominacion` (opcional).
+>   - `superLineaDenominacion` — texto parcial, insensible a mayúsculas, sobre `superLinea.denominacion` (opcional).
+>   - Ambos pueden combinarse (AND). Si no se envían, el comportamiento es idéntico a antes de CR-004 (retrocompatible).
 > - `search-by-rapido` → `?codigo=&exacto=&skip=&take=`
 > - `find-all-for-marcas/select` y `find-all-for-lineas/select` → `?denominacion=`
 > - `DELETE` → `?usuarioId=` (requerido)
@@ -227,6 +230,41 @@ Base URL (Render): `https://proyecto1-back-xtni.onrender.com`
 ```
 
 > **Queries:** `search-by` → `?denominacion=&skip=&take=&incluirEliminados=` | `DELETE` → `?usuarioId=` (requerido)
+
+---
+
+## SuperLineaController — `/api/super-linea`
+| Método | Ruta | Cuerpo (JSON) |
+|---|---|---|
+| POST | `/api/super-linea` | Ver ejemplo abajo |
+| GET | `/api/super-linea/search-by` | — (query) |
+| GET | `/api/super-linea/find-all-for-super-lineas/select` | — (query `?denominacion=`) |
+| GET | `/api/super-linea/:id` | — |
+| PUT | `/api/super-linea/:id` | Ver ejemplo abajo |
+| DELETE | `/api/super-linea/:id` | — (query: `usuarioId`) |
+| GET | `/api/super-linea/:id/audit` | — |
+
+**POST `/api/super-linea`** — `CreateSuperLineaDto`:
+
+```json
+{
+  "denominacion": "Almacén",    // string, REQUERIDO
+  "observacion": "Opcional",    // string, opcional
+  "usuarioCreatedId": 1         // número, REQUERIDO
+}
+```
+
+**PUT `/api/super-linea/:id`** — `UpdateSuperLineaDto`:
+
+```json
+{
+  "denominacion": "Almacén",
+  "observacion": "Opcional",
+  "usuarioUpdatedId": 2         // número, REQUERIDO
+}
+```
+
+> **Queries:** `search-by` → `?denominacion=&skip=&take=&incluirEliminados=` | `find-all-for-super-lineas/select` → `?denominacion=` (devuelve SuperLíneas activas **excluyendo** `sistema=1`, para combos seleccionables) | `DELETE` → `?usuarioId=` (requerido)
 
 ---
 

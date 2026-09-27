@@ -15,6 +15,7 @@ import { CreateMarcaDto } from '../../dto/create-marca.dto';
 import { MarcaDto } from '../../dto/marca.dto';
 import { MarcaMapper } from '../../mappers/marca.mapper';
 import { PoliticaEliminacionMarca } from '../../domain/services/politica-eliminacion-marca.service';
+import { IProductoRepository } from '../../../producto/domain/interfaces/producto.repository-interface';
 
 import { Marca } from '../../domain/entities/marca.entity';
 
@@ -26,6 +27,8 @@ export class MarcaService {
     private readonly repository: IMarcaRepository,
     private readonly usuarioService: UsuarioService,
     private readonly validacionesService: PoliticaEliminacionMarca,
+    @Inject('IProductoRepository')
+    private readonly productoRepository: IProductoRepository,
   ) {}
 
   private readonly ENTITY_NAME = 'Marca';
@@ -53,6 +56,17 @@ export class MarcaService {
       await this.checkDenominacionExists(dto.denominacion, id);
 
     const entity = await this.repository.update(id, dto);
+
+    if (dto.denominacion && dto.denominacion !== marca.denominacion) {
+      this.logger.log(
+        `Propagando nueva denominación de ${this.ENTITY_NAME} "${entity.denominacion}" a productos automáticos`,
+      );
+      await this.productoRepository.regenerarDenominacionesPorMarca(
+        id,
+        entity.denominacion,
+      );
+    }
+
     return MessageFrontUtils.createSimple(
       `${this.ENTITY_NAME}`,
       entity.denominacion,

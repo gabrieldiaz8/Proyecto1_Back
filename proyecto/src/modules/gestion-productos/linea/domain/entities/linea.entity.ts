@@ -7,10 +7,13 @@ import {
   DeleteDateColumn,
   OneToMany,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 
 import { Producto } from '../../../producto/domain/entities/producto.entity';
 import { CantidadColumn } from 'src/modules/common/decorators/cantidad-column.decorator';
+import { SuperLinea } from 'src/modules/gestion-productos/super-linea/domain/entities/super-linea.entity';
 
 @Entity('linea')
 @Index(['denominacion', 'deletedAt'], { unique: true })
@@ -23,6 +26,13 @@ export class Linea {
 
   @Column({ type: 'text', nullable: true })
   observacion?: string;
+
+  @ManyToOne(() => SuperLinea, (superLinea) => superLinea.lineas)
+  @JoinColumn({ name: 'superLineaId' })
+  superLinea: SuperLinea;
+
+  @Column({ type: 'int' })
+  superLineaId: number;
 
   @OneToMany(() => Producto, (producto) => producto.linea)
   productos: Producto[];

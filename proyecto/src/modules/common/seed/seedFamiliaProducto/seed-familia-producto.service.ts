@@ -2,9 +2,61 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Linea } from 'src/modules/gestion-productos/linea/domain/entities/linea.entity';
 import { Marca } from 'src/modules/gestion-productos/marca/domain/entities/marca.entity';
+import { SuperLinea } from 'src/modules/gestion-productos/super-linea/domain/entities/super-linea.entity';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { Proveedor } from 'src/modules/organizacion/proveedor/domain/entities/proveedor.entity';
 import { DeepPartial, Repository } from 'typeorm';
+
+const LINEAS_ENTRY_DATA: LineaEntryData[] = [
+  {
+    denominacion: 'Aceites',
+    sistema: 0,
+    usuarioCreatedId: 1,
+  },
+
+  {
+    denominacion: 'Aceitunas',
+    sistema: 0,
+    usuarioCreatedId: 1,
+  },
+
+  {
+    denominacion: 'Azucar',
+    sistema: 0,
+    usuarioCreatedId: 1,
+  },
+
+  {
+    denominacion: 'BOLSAS',
+    sistema: 0,
+    usuarioCreatedId: 1,
+  },
+
+  {
+    denominacion: 'Chocolates',
+    sistema: 0,
+    usuarioCreatedId: 1,
+  },
+
+  {
+    denominacion: 'HARINAS',
+    sistema: 0,
+    usuarioCreatedId: 1,
+  },
+
+  {
+    denominacion: 'MARGARINAS Y GRASAS',
+    sistema: 0,
+    usuarioCreatedId: 1,
+  },
+];
+
+interface LineaEntryData {
+  denominacion: string;
+  sistema: number;
+  usuarioCreatedId: number;
+  superLineaId?: number;
+}
 
 @Injectable()
 export class SeedFamiliaProductoService {
@@ -16,7 +68,8 @@ export class SeedFamiliaProductoService {
     @InjectRepository(Marca)
     private readonly marcaRepository: Repository<Marca>,
 
-
+    @InjectRepository(SuperLinea)
+    private readonly superLineaRepository: Repository<SuperLinea>,
 
     @InjectRepository(Proveedor)
     private readonly proveedorRepository: Repository<Proveedor>,
@@ -24,56 +77,10 @@ export class SeedFamiliaProductoService {
     @InjectRepository(Usuario)
     private readonly usuarioRepository: Repository<Usuario>,
 
-
   ) {}
 
-
-  async seedLineas() {
-    const entryData = [
-      {
-        denominacion: 'Aceites',
-        sistema: 0,
-        usuarioCreatedId: 1,
-      },
-
-      {
-        denominacion: 'Aceitunas',
-        sistema: 0,
-        usuarioCreatedId: 1,
-      },
-
-      {
-        denominacion: 'Azucar',
-        sistema: 0,
-        usuarioCreatedId: 1,
-      },
-    
-      {
-        denominacion: 'BOLSAS',
-        sistema: 0,
-        usuarioCreatedId: 1,
-      },
-
-      {
-        denominacion: 'Chocolates',
-        sistema: 0,
-        usuarioCreatedId: 1,
-      },
-
-      {
-        denominacion: 'HARINAS',
-        sistema: 0,
-        usuarioCreatedId: 1,
-      },
-
-      {
-        denominacion: 'MARGARINAS Y GRASAS',
-        sistema: 0,
-        usuarioCreatedId: 1,
-      },
-
-    
-    ];
+  async seedLineas(entryData: LineaEntryData[] = LINEAS_ENTRY_DATA) {
+    const superLineaSinClasificar = await this.getSinClasificarSuperLinea();
 
     for (const data of entryData) {
       const exists = await this.lineaRepository.findOneBy({
@@ -81,7 +88,6 @@ export class SeedFamiliaProductoService {
       });
 
       if (!exists) {
-        
         const usuarioCreated = await this.usuarioRepository.findOneBy({
           id: data.usuarioCreatedId,
         });
@@ -90,15 +96,15 @@ export class SeedFamiliaProductoService {
           console.log(
             `⚠️ No se encontró el usuario "${data.usuarioCreatedId}".`,
           );
-          continue; // Evita crear la línea sin superlínea
+          continue;
         }
 
         const linea = this.lineaRepository.create({
           denominacion: data.denominacion.toUpperCase(),
           sistema: data.sistema,
-
+          superLineaId: data.superLineaId ?? superLineaSinClasificar.id,
           usuarioCreatedId: usuarioCreated.id,
-        } as DeepPartial<Linea>); 
+        } as DeepPartial<Linea>);
 
         await this.lineaRepository.save(linea);
         console.log(`✅ Linea "${data.denominacion}" creada.`);
@@ -157,5 +163,24 @@ export class SeedFamiliaProductoService {
     await this.seedMarcas();
 
     console.log('✅ Todos los seeds completados.');
+  }
+
+  private async getSinClasificarSuperLinea(): Promise<SuperLinea> {
+    const existente = await this.superLineaRepository.findOneBy({
+      denominacion: 'Sin clasificar',
+    });
+
+    if (existente) {
+      return existente;
+    }
+
+    const creada = this.superLineaRepository.create({
+      denominacion: 'Sin clasificar',
+      observacion: 'Asignada automáticamente por el sistema a líneas migradas',
+      sistema: 1,
+      usuarioCreatedId: 1,
+    } as DeepPartial<SuperLinea>);
+
+    return this.superLineaRepository.save(creada);
   }
 }

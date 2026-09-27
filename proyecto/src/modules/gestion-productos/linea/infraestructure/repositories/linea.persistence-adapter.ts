@@ -1,3 +1,4 @@
+import { TipoRegistro } from 'src/modules/common/enums/tipo-registro.enum';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DatabaseConnectionException } from 'src/modules/common/exceptions/database-connection.exception';
@@ -47,6 +48,7 @@ export class LineaPersistenceAdapter
         stockMinimo: data.stockMinimo,
         usuarioCreatedId: data.usuarioCreatedId,
         observacion: data.observacion,
+        superLineaId: data.superLineaId,
       });
 
       const entityGuardada = await repo.save(nuevaEntity);
@@ -81,6 +83,7 @@ export class LineaPersistenceAdapter
     entity.utilizaStockMinimo = data.utilizaStockMinimo;
     entity.stockMinimo = data.stockMinimo ?? 0;
     entity.usuarioCreatedId = data.usuarioCreatedId;
+    entity.superLineaId = data.superLineaId ?? entity.superLineaId;
 
     // Guardar entidad antes de procesar sublíneas (opcional según lógica de negocio)
     const entityActualizada = await repo.save(entity);
@@ -92,6 +95,7 @@ export class LineaPersistenceAdapter
     try {
       const entity = await this.repository
         .createQueryBuilder('linea')
+        .leftJoinAndSelect('linea.superLinea', 'superLinea')
         .where('linea.id = :id', { id })
         .andWhere('linea.deletedAt IS NULL')
         .getOne();
@@ -116,7 +120,10 @@ export class LineaPersistenceAdapter
 
   async findAllListado(): Promise<Linea[]> {
     try {
-      const query = this.baseQuery();
+      const query = this.baseQuery().leftJoinAndSelect(
+        'linea.superLinea',
+        'superLinea',
+      );
       QueryBuilderHelper.applyOrder(query, this.ALIAS, 'denominacion', 'ASC');
       return await query.getMany();
     } catch (error) {
@@ -163,7 +170,7 @@ export class LineaPersistenceAdapter
       }
 
       this.logger.log(
-        `✅ Encontrada línea (puede estar activa o eliminada): ID=${entity.id}, denominación=${entity.denominacion}`,
+        `Encontrada línea (puede estar activa o eliminada): ID=${entity.id}, denominación=${entity.denominacion}`,
       );
       return entity;
     } catch (error) {
@@ -178,7 +185,10 @@ export class LineaPersistenceAdapter
     incluirEliminados = false,
   ): Promise<{ data: Linea[]; total: number }> {
     try {
-      const query = this.baseQuery(incluirEliminados)
+      const query = this.baseQuery(incluirEliminados).leftJoinAndSelect(
+        'linea.superLinea',
+        'superLinea',
+      );
 
       if (denominacion) {
         query.andWhere(`UPPER(${this.ALIAS}.denominacion) LIKE :denominacion`, {
@@ -198,7 +208,10 @@ export class LineaPersistenceAdapter
 
   async findAllFor(denominacion: string): Promise<Linea[]> {
     try {
-      const query = this.baseQuery()
+      const query = this.baseQuery().leftJoinAndSelect(
+        'linea.superLinea',
+        'superLinea',
+      );
       query.andWhere('UPPER(linea.denominacion) LIKE :denominacion', {
         denominacion: `%${denominacion.toUpperCase()}%`,
       });
@@ -215,8 +228,9 @@ export class LineaPersistenceAdapter
     try {
       const query = this.repository
         .createQueryBuilder('linea')
+        .leftJoinAndSelect('linea.superLinea', 'superLinea')
         .where('linea.deletedAt IS NULL')
-        .andWhere('linea.sistema = :sistema', { sistema: 0 });
+        .andWhere('linea.sistema = :sistema', { sistema: TipoRegistro.USUARIO });
       if (denominacion && denominacion.trim() !== '') {
         query.andWhere('UPPER(linea.denominacion) LIKE :denominacion', {
           denominacion: `%${denominacion.toUpperCase()}%`,
@@ -304,3 +318,4 @@ export class LineaPersistenceAdapter
     }
   }
 }
+

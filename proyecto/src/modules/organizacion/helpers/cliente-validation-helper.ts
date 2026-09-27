@@ -106,6 +106,26 @@ export class ClienteValidationHelper {
     }
   }
 
+  private validarFormatoCuit(cuit?: string): void {
+    if (cuit === undefined || cuit === null || cuit.trim() === '') return;
+
+    if (!/^\d{11}$/.test(cuit)) {
+      throw new BadRequestException(
+        'El CUIT debe contener exactamente 11 dígitos numéricos, sin guiones ni espacios.',
+      );
+    }
+  }
+
+  private validarFormatoDni(dni?: string): void {
+    if (dni === undefined || dni === null || dni.trim() === '') return;
+
+    if (!/^\d{7,8}$/.test(dni)) {
+      throw new BadRequestException(
+        'El DNI debe contener 7 u 8 dígitos numéricos.',
+      );
+    }
+  }
+
   async validateCreateCliente(dto: CreateClienteDto) {
     const denominacion = await this.validateAndGetDenominacionUnique(
       dto.denominacion,
@@ -114,6 +134,8 @@ export class ClienteValidationHelper {
     const personal = await this.validateAndGetPersonal(dto);
     const usuario = await this.validateAndGetUsuario(dto.usuarioCreatedId);
     const categoriaIVA = await this.validateAndGetCondicionIva(dto);
+    this.validarFormatoCuit(dto.cuit);
+    this.validarFormatoDni(dto.dni);
     await this.validateAndGetCuitUnique(dto.cuit, 0);
     /**
      * no controla por pedido del cliente el dni
@@ -131,6 +153,8 @@ export class ClienteValidationHelper {
     const usuario = await this.validateAndGetUsuario(dto.usuarioUpdatedId);
     const categoriaIVA = await this.validateAndGetCondicionIva(dto);
     const personal = await this.validateAndGetPersonal(dto);
+    this.validarFormatoCuit(dto.cuit);
+    this.validarFormatoDni(dto.dni);
     await this.validateAndGetCuitUnique(dto.cuit, id);
     await this.validateAndGetDniUnique(dto.dni, id);
 

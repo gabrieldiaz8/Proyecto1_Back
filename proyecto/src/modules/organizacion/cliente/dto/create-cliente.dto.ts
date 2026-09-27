@@ -40,12 +40,12 @@ export class CreateClienteDto implements CondicionIvaValidable {
 
   @IsString()
   @IsOptional()
-  @MaxLength(255)
+  @MaxLength(11)
   cuit?: string;
 
   @IsString()
   @IsOptional()
-  @MaxLength(255)
+  @MaxLength(8)
   dni?: string;
 
   @IsNotEmpty({ message: 'La Condicion IVA es obligatoria.' })

@@ -9,6 +9,7 @@ import { Producto } from 'src/modules/gestion-productos/producto/domain/entities
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 
 import { Proveedor } from 'src/modules/organizacion/proveedor/domain/entities/proveedor.entity';
+import { SuperLinea } from 'src/modules/gestion-productos/super-linea/domain/entities/super-linea.entity';
 
 @Module({
   imports: [
@@ -19,8 +20,7 @@ import { Proveedor } from 'src/modules/organizacion/proveedor/domain/entities/pr
       Producto,
       Usuario,
       Proveedor,
-
-    
+      SuperLinea,
     ]), // Repositorios que se inyectarán
   ],
   controllers: [SeedFamiliaProductoController], // Agregar el controlador aquí

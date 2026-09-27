@@ -1,15 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CreateProductoDto } from '../../dto/create-producto.dto';
 import { Producto } from '../../domain/entities/producto.entity';
 import { IProductoRepository } from '../../domain/interfaces/producto.repository-interface';
 import { ProductoPersistenceAdapter } from './producto.persistence-adapters';
-import { Linea } from '../../../linea/domain/entities/linea.entity';
-import { Marca } from '../../../marca/domain/entities/marca.entity';
-import { UpdateProductoDto } from '../../dto/update-producto.dto';
-import { DatabaseConnectionException } from 'src/modules/common/exceptions/database-connection.exception';
 import { IUnitOfWork } from 'src/modules/common/unit-of-work/iunit-of-work.';
 import { Usuario } from 'src/modules/gestion-usuario/usuario/domain/entities/usuario.entity';
 import { UpdatePrecioDto } from '../../dto/update-precio.dto';
+import { ActualizarPreciosMasivoDto } from '../../dto/actualizar-precios-masivo.dto';
 
 @Injectable()
 export class ProductoRepository implements IProductoRepository {
@@ -25,44 +21,8 @@ export class ProductoRepository implements IProductoRepository {
 
   private readonly ENTITY_NAME = 'Producto';
 
-  async create(
-    data: CreateProductoDto,
-    linea: Linea,
-    marca: Marca,
-    usuario: Usuario,
-  ): Promise<Producto> {
-    this.logger.log(`Creando un nuevo `);
-    try {
-      return await this.persistenceService.create(
-        data,
-        linea,
-        marca,
-        usuario,
-      );
-    } catch (error) {
-      this.logger.error(`Error al crear ${this.ENTITY_NAME}: `);
-      throw new DatabaseConnectionException(
-        'No se pudo crear la entidad en la base de datos.',
-      );
-    }
-  }
-
-  async update(
-    id: number,
-    data: UpdateProductoDto,
-    linea: Linea,
-    marca: Marca,
-
-    usuario: Usuario,
-  ): Promise<Producto> {
-    return this.persistenceService.update(
-      id,
-      data,
-      linea,
-      marca,
-
-      usuario,
-    );
+  async save(producto: Producto): Promise<Producto> {
+    return this.persistenceService.save(producto);
   }
 
   async updateEntity(uow: IUnitOfWork, data: Producto): Promise<Producto> {
@@ -77,7 +37,6 @@ export class ProductoRepository implements IProductoRepository {
     codigoReferencia: string,
     marca_id: number,
     linea_id: number,
-    proveedor_id: number,
     conStock: boolean,
     skip: number,
     take: number,
@@ -89,7 +48,6 @@ export class ProductoRepository implements IProductoRepository {
       codigoReferencia,
       marca_id,
       linea_id,
-      proveedor_id,
       conStock,
       skip,
       take,
@@ -180,6 +138,41 @@ export class ProductoRepository implements IProductoRepository {
 
   async  existsByCodigoProveedor(codigoProveedor: string, excludeId: number): Promise<boolean> {
    return this.persistenceService.existsByCodigoProveedor(codigoProveedor, excludeId);
+  }
+
+  async regenerarDenominacionesPorMarca(
+    marcaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    return this.persistenceService.regenerarDenominacionesPorMarca(
+      marcaId,
+      nuevaDenominacion,
+    );
+  }
+
+  async regenerarDenominacionesPorLinea(
+    lineaId: number,
+    nuevaDenominacion: string,
+  ): Promise<number> {
+    return this.persistenceService.regenerarDenominacionesPorLinea(
+      lineaId,
+      nuevaDenominacion,
+    );
+  }
+  async findActivos(): Promise<Producto[]> {
+    return this.persistenceService.findActivos();
+  }
+
+  async findActivosByLinea(lineaId: number): Promise<Producto[]> {
+    return this.persistenceService.findActivosByLinea(lineaId);
+  }
+
+  async saveMany(
+    productos: Producto[],
+    preciosAnteriores?: Map<number, number>,
+    dto?: ActualizarPreciosMasivoDto,
+  ): Promise<Producto[]> {
+    return this.persistenceService.saveMany(productos, preciosAnteriores, dto);
   }
 
 }

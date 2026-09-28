@@ -21,8 +21,8 @@ export class ProductoRepository implements IProductoRepository {
 
   private readonly ENTITY_NAME = 'Producto';
 
-  async save(producto: Producto): Promise<Producto> {
-    return this.persistenceService.save(producto);
+  async save(producto: Producto, motivo?: string): Promise<Producto> {
+    return this.persistenceService.save(producto, motivo);
   }
 
   async updateEntity(uow: IUnitOfWork, data: Producto): Promise<Producto> {

@@ -134,7 +134,10 @@ this.logger.log(`Actualizando  ${this.ENTITY_NAME} con ID: ${id}`);
 
     productoActual.actualizarDatos(cambios);
 
-    const entityActualizada = await this.repository.save(productoActual);
+    const entityActualizada = await this.repository.save(
+      productoActual,
+      dto.motivo,
+    );
 
     return MessageFrontUtils.createSimple(
       `${this.ENTITY_NAME}`,

@@ -34,7 +34,7 @@ export interface IProductoRepository {
 
   findByIdWithoutRelations(id: number): Promise<Producto | null> | undefined;
 
-  save(producto: Producto): Promise<Producto>;
+  save(producto: Producto, motivo?: string): Promise<Producto>;
 
   updateEntity(uow: IUnitOfWork, data: Producto): Promise<Producto>;
 

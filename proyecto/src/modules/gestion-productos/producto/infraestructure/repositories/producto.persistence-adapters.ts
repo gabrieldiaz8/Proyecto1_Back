@@ -31,8 +31,8 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
 
   /**
    * Motivo por defecto para los cambios de precio que llegan por la edición
-   * general del producto (PUT /producto/:id). Ese flujo no recibe un motivo
-   * del cliente, pero historial_precio.motivo es NOT NULL.
+   * general del producto (PUT /producto/:id) cuando el cliente no envía uno.
+   * historial_precio.motivo es NOT NULL, así que nunca se persiste en null.
    */
   private readonly MOTIVO_EDICION_GENERAL =
     'Modificado desde edición general de producto';
@@ -49,7 +49,7 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
 
 
   @Transactional()
-  async save(producto: Producto): Promise<Producto> {
+  async save(producto: Producto, motivo?: string): Promise<Producto> {
     const repo = this.uow.getRepository(Producto);
     try {
       // En una edición la entidad llega ya mutada con el precio nuevo, así que
@@ -70,7 +70,7 @@ export class ProductoPersistenceAdapter implements IProductoRepository {
           entityGuardada.id,
           precioAnterior,
           entityGuardada.precio ?? 0,
-          this.MOTIVO_EDICION_GENERAL,
+          motivo ?? this.MOTIVO_EDICION_GENERAL,
         );
       }
 
